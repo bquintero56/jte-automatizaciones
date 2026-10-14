@@ -49,27 +49,27 @@ date +'%H:%M'
     // Busca en una ruta los archivos que coinciden con el patrón.
     // Devuelve null si la ruta no es accesible, o la lista de coincidencias (vacía si no hay).
     def buscar = { String rutaBuscar, String patron ->
-        def rcRuta = sh(
+        // Una sola conexión: lista la carpeta en un archivo local; el rc indica si la ruta es accesible
+        def rc = sh(
             returnStatus: true,
-            script: """
-                ssh -o StrictHostKeyChecking=no ${user}@${host} \
-                    "sudo -n -u ${runAsUser} test -d '${rutaBuscar}'"
-            """
+            script: """#!/bin/sh
+ssh -o StrictHostKeyChecking=no ${user}@${host} \\
+    "sudo -n -u ${runAsUser} test -d '${rutaBuscar}' && sudo -n -u ${runAsUser} ls -1 '${rutaBuscar}'" > buscar_listado.txt
+"""
         )
-        if (rcRuta != 0) {
-            return null
+        if (rc != 0) {
+            return null     // no existe, sin permiso, sudo pidió contraseña o falló el SSH
         }
 
+        // Filtrar en el nodo, sin volver a conectarse
         def salida = sh(
             returnStdout: true,
             script: """#!/bin/sh
-ssh -o StrictHostKeyChecking=no ${user}@${host} \\
-    "sudo -n -u ${runAsUser} ls -1 '${rutaBuscar}'" \\
-| while IFS= read -r f; do
+while IFS= read -r f; do
     case "\$f" in
         ${patron}) echo "\$f" ;;
     esac
-  done
+done < buscar_listado.txt
 """
         ).trim()
 

@@ -71,9 +71,10 @@ jte-pipelines-template/
    - `sudo -n` evita que el job se cuelgue pidiendo contraseña (falla con `rc=1`).
    - Sudoers en el servidor: `svc_jenkins ALL=(usr_datos) NOPASSWD: /usr/bin/test, /usr/bin/ls, /usr/bin/cat`.
      Se evita `find` a propósito (permitirlo en sudoers abre ejecución arbitraria con `-exec`).
-3. **Búsqueda con comodín.** `svc_jenkins` no puede expandir `*` en esas carpetas, así que se hace `sudo ls -1 <ruta>` y se filtra en el nodo
-   con un `case` de shell. La función `buscar(ruta, patron)` devuelve `null` si la ruta no es accesible (`test -d` falla), o la lista de
-   coincidencias (vacía si no hay). Está duplicada en cada step.
+3. **Búsqueda con comodín.** `svc_jenkins` no puede expandir `*` en esas carpetas, así que se lista la carpeta y se filtra en el nodo
+   con un `case` de shell. `buscar(ruta, patron)` usa **una sola conexión SSH**: `sudo test -d <ruta> && sudo ls -1 <ruta>` volcado a
+   `buscar_listado.txt` en el workspace; si el `rc` no es 0 (no existe, sin permiso, sudo pidió contraseña o falló el SSH) devuelve `null`.
+   Si no, filtra el archivo local y devuelve la lista de coincidencias (vacía si no hay). Está duplicada en cada step.
 4. **Log limpio.** Los `sh` con `while` usan `"""#!/bin/sh` pegado a las comillas y sin sangría: Jenkins ejecuta `sh` con `-x` y, sin el
    shebang, el log se inunda de `IFS= / read -r f / case "$f" in`. Las continuaciones de línea dentro de ese bloque son `\\`.
 5. **Fechas con `date` en el nodo**, con la zona horaria de la config (`TZ='America/Bogota' date -d 'N days ago' +'<formato>'`).
@@ -191,8 +192,8 @@ que reportar. Actualmente **todas las tareas están a las 15:00**.
 12. Si Jenkins tarda en arrancar más de `ventanaMinutos`, esa validación no se ejecuta ese día (subir la ventana si pasa).
 13. **Ventanas solapadas:** si dos horas distintas están a menos de `ventanaMinutos` (ej. 15:00 y 15:10), la ejecución de la segunda repite
     las tareas de la primera y se envían dos correos. Hoy no pasa porque todo está a las 15:00.
-14. **`buscar()` y permisos:** `test -d` no comprueba lectura y el `ssh … | while` oculta el código de salida de `ls`; una carpeta sin
-    permiso de lectura se reporta como "no encontrado" en vez de "ruta no accesible". Además hace 2 conexiones SSH por búsqueda.
+14. ~~`buscar()` ocultaba el fallo de `ls` y hacía 2 conexiones SSH~~ → resuelto: una conexión y el `rc` de `ls` decide (ver §3.3).
+    Pendiente opcional: distinguir en log/correo "no existe" / "sin permiso" / "falló el SSH" (hoy todo es "ruta no accesible").
 15. **ENVIOCC con muchos PDF:** la comparación `findAll { contains }` es cuadrática y lenta en CPS; usar `Set`.
 16. Menores: `.pdf` fijo en minúscula en SIN_APROBADO; HTML del correo sin escapar; `estadoSiFaltan` sin lista de valores permitidos en
     `library_config`; `log_rotator` declarado pero sin usar; `pipeline_template` de ambos configs pendiente de ajustar a la ruta real.
