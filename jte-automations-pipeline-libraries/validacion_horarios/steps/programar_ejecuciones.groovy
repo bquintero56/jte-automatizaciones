@@ -14,14 +14,7 @@ void call() {
         error "Valor de HORA no válido: '${params.HORA}'. Usa vacío, TODOS o HH:mm (ej. 15:00)"
     }
 
-    def horas = config.archivos.collect { it.hora }
-    if (config.sinAprobado?.hora) {
-        horas << config.sinAprobado.hora
-    }
-    if (config.enviocc?.hora) {
-        horas << config.enviocc.hora
-    }
-    horas = horas.unique()
+    def horas = horas_programadas()
 
     // Las horas de la config también deben ser HH:mm
     def horasMal = horas.findAll { !esHora(String.valueOf(it)) }

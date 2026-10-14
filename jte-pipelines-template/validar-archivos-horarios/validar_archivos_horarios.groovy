@@ -1,6 +1,7 @@
 def resultados  = []
 def resultadoSA = [:]
 def resultadoEC = [:]
+def franja      = [:]
 
 programar_ejecuciones()
 
@@ -9,13 +10,18 @@ timeout(time: execution.time, unit: execution.units) {
     node(jenkins_agent_label) {
         withFolderProperties {
             try {
+                stage('Horario: calcular franja') {
+                    // Una sola vez para las tres tareas: todas usan la misma referencia
+                    franja = franja_horaria(params.HORA)
+                }
+
                 stage('SSH: validar archivos') {
-                    resultados = validar_archivos_horario(params.HORA)
+                    resultados = validar_archivos_horario(franja)
                 }
 
                 stage('SIN_APROBADO: validar y procesar') {
                     try {
-                        resultadoSA = procesar_sin_aprobado(params.HORA)
+                        resultadoSA = procesar_sin_aprobado(franja)
                     }
                     catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
                         throw e     // aborto manual o timeout: no se convierte en ERROR_PROCESO
@@ -29,7 +35,7 @@ timeout(time: execution.time, unit: execution.units) {
 
                 stage('ENVIOCC: validar y comparar') {
                     try {
-                        resultadoEC = procesar_enviocc(params.HORA)
+                        resultadoEC = procesar_enviocc(franja)
                     }
                     catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
                         throw e     // aborto manual o timeout: no se convierte en ERROR_PROCESO

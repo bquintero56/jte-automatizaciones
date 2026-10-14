@@ -48,6 +48,8 @@ jte-automations-pipeline-libraries/
 │   ├── library_config.groovy
 │   └── steps/
 │       ├── programar_ejecuciones.groovy      cron + parámetro HORA
+│       ├── horas_programadas.groovy          horas únicas de las tres tareas
+│       ├── franja_horaria.groovy             qué franja toca en esta ejecución
 │       ├── validar_archivos_horario.groovy   las 10 validaciones
 │       ├── procesar_sin_aprobado.groovy      tarea SIN_APROBADO
 │       └── procesar_enviocc.groovy           tarea ENVIOCC
@@ -152,9 +154,13 @@ que reportar. Actualmente **todas las tareas están a las 15:00**.
 
 ### 5.4 Horarios, cron y parámetro `HORA`
 
-- `programar_ejecuciones()` (primera línea del template) arma el cron con las horas únicas de `archivos`, `sinAprobado.hora` y `enviocc.hora`, y
-  registra el parámetro `HORA` con `properties([...])`.
-- Cada tarea corre si `0 <= (referencia - hora) < ventanaMinutos` (tolerancia por si Jenkins arranca tarde). `referencia` es la hora actual o el valor de `HORA`.
+- `programar_ejecuciones()` (primera línea del template) arma el cron con `horas_programadas()` (horas únicas de `archivos`,
+  `sinAprobado.hora` y `enviocc.hora`) y registra el parámetro `HORA` con `properties([...])`.
+- **Franja horaria:** el template llama **una vez** a `franja_horaria(params.HORA)` (stage `Horario: calcular franja`) y pasa el mapa
+  `[todos, referencia, horas]` a los tres steps (`validar_archivos_horario(franja)`, `procesar_sin_aprobado(franja)`, `procesar_enviocc(franja)`).
+  La franja es la hora programada **más reciente** con `0 <= (referencia - hora) < ventanaMinutos`; una tarea corre si `franja.todos` o si su
+  `hora` está en `franja.horas`. Así, con tareas a las 15:00 y 15:10, la ejecución de las 15:10 no repite las de las 15:00, y las tres tareas
+  usan la misma referencia aunque una tarde varios minutos. `referencia` es la hora actual o el valor de `HORA`.
 - `HORA` vacío = automático; `TODOS` = ejecuta todo (pruebas); `HH:mm` = simula esa hora. `programar_ejecuciones()` valida el parámetro
   y las horas de la config (`HH:mm`, 0-23:0-59) y falla con un mensaje claro antes de conectarse por SSH.
 - `diasAtras` (0 = hoy, 1 = ayer) mueve la fecha de las **tres** tareas; sirve para probar con archivos de días anteriores. Producción: `0`.
@@ -187,14 +193,14 @@ que reportar. Actualmente **todas las tareas están a las 15:00**.
 7. **Varios CSV que coincidan:** se usa el primero (el log lo advierte).
 8. **Nombres en las rutas específicas del pipeline 1:** en algún momento se mencionó `REPORTE{fecha}.csv_*` (números después del `.csv`); la config actual usa `REPORTE_{fecha}_*.csv`. Confirmar el nombre real.
 9. **Pipeline 1 busca la fecha de "ayer":** el lunes busca el domingo. Si no se generan archivos en fin de semana, usar el último día hábil.
-10. **Duplicación:** `buscar()`, el cálculo de hora y el armado de fechas están repetidos en varios steps. Candidato a refactor (librería o step común) y a unificar los dos steps de correo.
+10. **Duplicación:** `buscar()` y el armado de fechas están repetidos en varios steps (el cálculo de hora ya está centralizado en `franja_horaria()`). Candidato a refactor (librería o step común) y a unificar los dos steps de correo.
 11. **`properties([...])` en el template** reemplaza los triggers/parámetros definidos en la interfaz del job, y se registra la primera vez que el job corre: tras cambiar horas hay que lanzarlo una vez a mano.
 12. Si Jenkins tarda en arrancar más de `ventanaMinutos`, esa validación no se ejecuta ese día (subir la ventana si pasa).
-13. **Ventanas solapadas:** si dos horas distintas están a menos de `ventanaMinutos` (ej. 15:00 y 15:10), la ejecución de la segunda repite
-    las tareas de la primera y se envían dos correos. Hoy no pasa porque todo está a las 15:00.
+13. ~~Ventanas solapadas (15:00 y 15:10 repetían tareas)~~ → resuelto con `franja_horaria()` (ver §5.4). Límite que queda: si la ejecución
+    de las 15:00 arranca después de las 15:10, cae en la franja 15:10 y las tareas de las 15:00 no corren ese día.
 14. ~~`buscar()` ocultaba el fallo de `ls` y hacía 2 conexiones SSH~~ → resuelto: una conexión y el `rc` de `ls` decide (ver §3.3).
     Pendiente opcional: distinguir en log/correo "no existe" / "sin permiso" / "falló el SSH" (hoy todo es "ruta no accesible").
-15. **ENVIOCC con muchos PDF:** la comparación `findAll { contains }` es cuadrática y lenta en CPS; usar `Set`.
+15. ~~ENVIOCC con comparación cuadrática~~ → resuelto: `contains` sobre `HashSet`.
 16. Menores: `.pdf` fijo en minúscula en SIN_APROBADO; HTML del correo sin escapar; `estadoSiFaltan` sin lista de valores permitidos en
     `library_config`; `log_rotator` declarado pero sin usar; `pipeline_template` de ambos configs pendiente de ajustar a la ruta real.
 

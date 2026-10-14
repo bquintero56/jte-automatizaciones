@@ -1,14 +1,21 @@
-Map call(String modo = '') {
+// franja: resultado de franja_horaria() → [todos, referencia, horas]
+Map call(Map franja) {
     def c         = config.enviocc
     def host      = config.host
     def user      = config.user
     def runAsUser = config.runAsUser
     def titulo    = c.textoCsv
 
+    // ¿Le toca correr en esta franja?
+    if (!franja.todos && !franja.horas.contains(c.hora)) {
+        echo "ENVIOCC está programado a las ${c.hora}; referencia ${franja.referencia}, se omite"
+        return [estado: 'OMITIDO']
+    }
+
     // Datos que van en todos los resultados (para la fila de la tabla del correo)
     def base = [titulo: titulo, comId: c.COM_ID, descripcion: c.DES]
 
-    // Fechas, mes y hora actual (las fechas respetan diasAtras)
+    // Fechas y mes (respetan diasAtras)
     def datos = sh(
         returnStdout: true,
         script: """#!/bin/sh
@@ -16,29 +23,12 @@ export TZ='${config.zonaHoraria}'
 date -d '${config.diasAtras} days ago' +'${c.formatoFechaCsv}'
 date -d '${config.diasAtras} days ago' +'${c.formatoFechaPdf}'
 date -d '${config.diasAtras} days ago' +'${config.formatoMes}'
-date +'%H:%M'
 """
     ).trim().readLines()
 
-    def fechaCsv   = datos[0]
-    def fechaPdf   = datos[1]
-    def mes        = datos[2]
-    def horaActual = datos[3]
-
-    // ¿Le toca correr a esta hora?
-    def todos      = (modo?.trim()?.toUpperCase() == 'TODOS')
-    def referencia = todos ? horaActual : (modo?.trim() ?: horaActual)
-
-    def aMinutos = { String hhmm ->
-        def p = hhmm.split(':')
-        return p[0].toInteger() * 60 + p[1].toInteger()
-    }
-
-    def diff = aMinutos(referencia) - aMinutos(c.hora)
-    if (!todos && !(diff >= 0 && diff < config.ventanaMinutos)) {
-        echo "ENVIOCC está programado a las ${c.hora}; referencia ${referencia}, se omite"
-        return [estado: 'OMITIDO']
-    }
+    def fechaCsv = datos[0]
+    def fechaPdf = datos[1]
+    def mes      = datos[2]
 
     def rutaCsv   = config.rutaBase.replace('{mes}', mes)
     def patronCsv = "*_${c.textoCsv}_${fechaCsv}.csv"
@@ -189,8 +179,11 @@ awk -v sep='${c.separador}' -v col='${c.columna}' -f enviocc_extraer.awk enviocc
     echo "PDFs encontrados en la ruta: ${enRuta.size()}"
 
     // ---------- 5) Comparar ----------
-    def faltanPdf = enArchivo.findAll { !enRuta.contains(it) }     // están en el archivo, no hay PDF
-    def sobranPdf = enRuta.findAll   { !enArchivo.contains(it) }   // hay PDF, no están en el archivo
+    // Búsqueda en Set (instantánea) en vez de en List (recorre toda la lista por cada nombre)
+    def setArchivo = new HashSet(enArchivo)
+    def setRuta    = new HashSet(enRuta)
+    def faltanPdf  = enArchivo.findAll { !setRuta.contains(it) }     // están en el archivo, no hay PDF
+    def sobranPdf  = enRuta.findAll    { !setArchivo.contains(it) }  // hay PDF, no están en el archivo
 
     if (faltanPdf) {
         echo "❌ FALTAN PDF en la ruta (generar ticket): ${faltanPdf.size()}"

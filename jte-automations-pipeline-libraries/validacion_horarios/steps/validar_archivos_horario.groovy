@@ -1,46 +1,33 @@
-List call(String modo = '') {
+// franja: resultado de franja_horaria() → [todos, referencia, horas]
+List call(Map franja) {
     def host      = config.host
     def user      = config.user
     def runAsUser = config.runAsUser
     def faltantes = []
     def resultados = []
 
-    // Fecha, mes y hora actual en la zona horaria configurada
+    // Fecha y mes en la zona horaria configurada
     def datos = sh(
         returnStdout: true,
         script: """#!/bin/sh
 export TZ='${config.zonaHoraria}'
 date -d '${config.diasAtras} days ago' +'${config.formatoFecha}'
 date -d '${config.diasAtras} days ago' +'${config.formatoMes}'
-date +'%H:%M'
 """
     ).trim().readLines()
 
-    def fecha      = datos[0]
-    def mes        = datos[1]
-    def horaActual = datos[2]
+    def fecha = datos[0]
+    def mes   = datos[1]
 
     // Qué archivos tocan en esta ejecución
-    def todos      = (modo?.trim()?.toUpperCase() == 'TODOS')
-    def referencia = todos ? horaActual : (modo?.trim() ?: horaActual)
-
-    def aMinutos = { String hhmm ->
-        def p = hhmm.split(':')
-        return p[0].toInteger() * 60 + p[1].toInteger()
-    }
-
     def seleccion = config.archivos.findAll { item ->
-        if (todos) {
-            return true
-        }
-        def diff = aMinutos(referencia) - aMinutos(item.hora)
-        return (diff >= 0 && diff < config.ventanaMinutos)
+        franja.todos || franja.horas.contains(item.hora)
     }
 
-    echo "Fecha: ${fecha} | Mes: ${mes} | Referencia: ${todos ? 'TODOS' : referencia}"
+    echo "Fecha: ${fecha} | Mes: ${mes} | Referencia: ${franja.todos ? 'TODOS' : franja.referencia}"
 
     if (!seleccion) {
-        echo "No hay validaciones programadas para las ${referencia} (ventana de ${config.ventanaMinutos} min)"
+        echo "No hay validaciones programadas para las ${franja.referencia} (ventana de ${config.ventanaMinutos} min)"
         return []
     }
 
