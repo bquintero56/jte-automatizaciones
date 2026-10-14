@@ -1,0 +1,217 @@
+# Contexto del proyecto: automatizaciones Jenkins con JTE
+
+Idioma de trabajo: **español** (comentarios, logs, mensajes de error y correos).
+
+## 1. Qué es esto
+
+Dos pipelines de **monitoreo** que corren en Jenkins con **Jenkins Templating Engine (JTE)**. Se conectan por SSH a un
+servidor remoto, comprueban que existan archivos (CSV y PDF) en ciertas rutas y envían **un correo HTML** con el resultado.
+
+- **Pipeline 1 – `validar-archivos`**: verifica que 5 archivos existan en una ruta general y también en su ruta específica.
+- **Pipeline 2 – `validar-archivos-horarios`**: tres tareas en un mismo job (10 validaciones de archivos, `SIN_APROBADO` y
+  `ENVIOCC`) con **un único correo** al final.
+
+Regla general: **un archivo faltante NO debe poner el pipeline en rojo**. Se informa por correo y en el log.
+
+## 2. Arquitectura JTE (1 repo, 3 carpetas)
+
+Todo vive en el repo `jte-automatizaciones`; en Jenkins cada fuente JTE apunta a su carpeta con *Base Directory*.
+
+| Carpeta | Qué contiene | Quién lo usa |
+|---|---|---|
+| `jte-pipeline-configurations-automations` | Una carpeta por automatización con su `pipeline_config.groovy`: **solo valores** (IP, usuarios, rutas, archivos, formatos, destinatarios). Sin lógica. | Todos los steps vía `config` |
+| `jte-automations-pipeline-libraries` | Una carpeta por librería con `library_config.groovy` (valida los campos) y `steps/*.groovy` (la **lógica**). | El template |
+| `jte-pipelines-template` | Una carpeta por automatización con el template `.groovy` que solo **orquesta**: llama a los steps en orden. | Jenkins |
+
+### Cómo se enlazan las piezas
+
+- El **nombre del bloque** en `pipeline_config.groovy` = **nombre de la carpeta** de la librería (`validacion_archivos`,
+  `validacion_horarios`, `notificacion_correo`). Si difiere una letra, JTE no la carga.
+- El **nombre del archivo** de un step es el nombre con que se llama en el template (`validar_archivos.groovy` → `validar_archivos()`).
+- Dentro de un step, `config` es el bloque de configuración de **esa** librería (`config.host`, `config.sinAprobado.hora`...).
+- `execution.time`, `execution.units` y `jenkins_agent_label` vienen de la sección `keywords` de la configuración.
+- **Todo campo de la config debe estar declarado en `library_config.groovy`** o JTE falla con
+  `field 'x' is not used`. Los bloques anidados (`sinAprobado { }`, `enviocc { }`) se declaran anidados también.
+
+### Estructura de directorios
+
+```
+jte-pipeline-configurations-automations/
+├── validar-archivos/pipeline_config.groovy
+└── validar-archivos-horarios/pipeline_config.groovy
+
+jte-automations-pipeline-libraries/
+├── validacion_archivos/                      (pipeline 1)
+│   ├── library_config.groovy
+│   └── steps/validar_archivos.groovy
+├── validacion_horarios/                      (pipeline 2)
+│   ├── library_config.groovy
+│   └── steps/
+│       ├── programar_ejecuciones.groovy      cron + parámetro HORA
+│       ├── validar_archivos_horario.groovy   las 10 validaciones
+│       ├── procesar_sin_aprobado.groovy      tarea SIN_APROBADO
+│       └── procesar_enviocc.groovy           tarea ENVIOCC
+└── notificacion_correo/                      (compartida)
+    ├── library_config.groovy
+    └── steps/
+        ├── enviar_correo_validacion_archivos.groovy   correo del pipeline 1
+        └── enviar_correo_resultados.groovy            correo del pipeline 2 (3 secciones)
+
+jte-pipelines-template/
+├── validar-archivos/validar_archivos.groovy
+└── validar-archivos-horarios/validar_archivos_horarios.groovy
+```
+
+## 3. Convenciones técnicas (respetarlas al modificar)
+
+1. **Nada quemado en los steps.** Todo valor sale de `config`. Un campo nuevo se agrega en la config **y** en `library_config.groovy`.
+2. **SSH sin credenciales de Jenkins.** El nodo `jenkins_agent_label` ya tiene el acceso SSH, así que no se usa `sshagent` ni `credentialsId`.
+   Comando base: `ssh -o StrictHostKeyChecking=no <user>@<host> "sudo -n -u <runAsUser> <comando>"`.
+   - `user` (`svc_jenkins`) es con quien se entra; `runAsUser` (`usr_datos`) es quien puede ver los archivos.
+   - `sudo -n` evita que el job se cuelgue pidiendo contraseña (falla con `rc=1`).
+   - Sudoers en el servidor: `svc_jenkins ALL=(usr_datos) NOPASSWD: /usr/bin/test, /usr/bin/ls, /usr/bin/cat`.
+     Se evita `find` a propósito (permitirlo en sudoers abre ejecución arbitraria con `-exec`).
+3. **Búsqueda con comodín.** `svc_jenkins` no puede expandir `*` en esas carpetas, así que se hace `sudo ls -1 <ruta>` y se filtra en el nodo
+   con un `case` de shell. La función `buscar(ruta, patron)` devuelve `null` si la ruta no es accesible (`test -d` falla), o la lista de
+   coincidencias (vacía si no hay). Está duplicada en cada step.
+4. **Log limpio.** Los `sh` con `while` usan `"""#!/bin/sh` pegado a las comillas y sin sangría: Jenkins ejecuta `sh` con `-x` y, sin el
+   shebang, el log se inunda de `IFS= / read -r f / case "$f" in`. Las continuaciones de línea dentro de ese bloque son `\\`.
+5. **Fechas con `date` en el nodo**, con la zona horaria de la config (`TZ='America/Bogota' date -d 'N days ago' +'<formato>'`).
+   No se calculan en Groovy (evita problemas de sandbox y de zona horaria del controller).
+6. **Estados, no excepciones.** Los steps devuelven listas/mapas con el resultado. `estadoSiFaltan` (`SUCCESS` | `UNSTABLE` | `FAILURE`)
+   decide el color del build en las validaciones de archivos: se aplica con `unstable(...)` o `currentBuild.result = 'FAILURE'`,
+   **nunca con `error`**, para que el pipeline siga y el correo se envíe. Un error técnico en `SIN_APROBADO` o `ENVIOCC` se captura y se
+   convierte en `estado: 'ERROR_PROCESO'` + `unstable(...)`.
+7. **Estructura de los templates:** `timeout(execution)` → `node(jenkins_agent_label)` → `withFolderProperties` → `try/catch/finally`,
+   con `clean_job_workspace()` en el `finally`. Cada tarea es un `stage`. Todo `catch (Exception e)` va precedido de
+   `catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) { throw e }`, para que un aborto manual o el `timeout`
+   detengan el job (estado ABORTED) en vez de tratarse como error.
+8. **Correo** con `emailext` (plugin Email Extension), `mimeType: 'text/html'`.
+   - Asunto: `<asuntoPrefijo> <NOMBRES SIN FECHA NI .csv, separados por coma> <asuntoSufijo> - <fecha>`
+     (ej. `Monitoreo activo Seguimiento DEVOLUCION, CONTADOR 360 - 2026-10-09`).
+   - Cuerpo: `Estimados buenos días,` → contenido → `Saludos.` (la "NOTA IMPORTANTE" que se mencionó al inicio **no** va en el correo).
+   - Tabla con `OK` en verde y `ERROR` en rojo.
+
+## 4. Pipeline 1 – `validar-archivos`
+
+**Objetivo:** cada día verificar 5 archivos (nombre con la fecha del **día anterior**) en dos sitios:
+1. **Ruta general** (`rutaGeneral`, ej. `/data/entrada`): nombre exacto, `REPORTE_{fecha}.csv`.
+2. **Ruta específica** de cada archivo (`rutaEspecifica`): nombre con comodín (`patronEspecifico`, ej. `REPORTE_{fecha}_*.csv`), porque
+   en esa ruta el nombre lleva números aleatorios.
+
+Un archivo queda `OK` solo si está en **las dos** rutas; si falta en cualquiera, `ERROR`.
+
+- **Config (`validacion_archivos`):** `host`, `user`, `runAsUser`, `formatoFecha` (`%Y%m%d`), `zonaHoraria`, `estadoSiFaltan`,
+  `rutaGeneral`, `archivos` (lista de `[nombre, rutaEspecifica, patronEspecifico]`). `{fecha}` se reemplaza por la fecha de ayer.
+- **Ejecución:** diaria a la 1:00 p. m. (`America/Bogota`). El cron está en el template con `properties([pipelineTriggers([cron(...)])])`.
+- **Step `validar_archivos()`** devuelve una lista; por archivo: `[proceso, archivo, estatus, rutas, fecha]`.
+  `rutas` = rutas donde **no** se encontró (la general, la específica o ambas; con ` (ruta no accesible)` si no se pudo entrar).
+- **Correo (`enviar_correo_validacion_archivos`):** se envía **siempre**. Tabla `PROCESO | ESTATUS | RUTA DONDE NO SE ENCONTRÓ`
+  (`-` cuando está `OK`).
+
+## 5. Pipeline 2 – `validar-archivos-horarios`
+
+Un solo job y **un solo correo al final**. Cada tarea decide si le toca correr según la hora (ver 5.4) y el correo se envía cuando hay algo
+que reportar. Actualmente **todas las tareas están a las 15:00**.
+
+### 5.1 Las 10 validaciones (`validar_archivos_horario`)
+
+- Busca cada archivo en `rutaBase` con `{mes}` = `AAAAMM` del día de ejecución (ej. `/Proyecto/M/BACKUP/202610`; en noviembre pasa solo a `202611`).
+- Nombre buscado: `prefijoNombre + nombre` con `{fecha}` reemplazada (ej. `*_DEVOLUCION_2026-10-09.csv`). Todos los archivos llevan
+  números aleatorios al inicio, por eso `prefijoNombre = '*_'`.
+- Cada archivo de la config lleva: `COM_ID` (ID numérico), `DES` (descripción), `nombre` y `hora`. Opcional: `ruta` para sobrescribir `rutaBase`.
+- Resultado por archivo: `[comId, descripcion, proceso, archivo, estatus, fecha]`.
+
+### 5.2 `SIN_APROBADO` (`procesar_sin_aprobado`)
+
+1. Busca el CSV `*_SIN_APROBADO_<AAAA-MM-DD>.csv` en `rutaBase/{mes}`. Si **no existe** → estado `CSV_NO_ENCONTRADO`, se informa por correo y la
+   tarea se detiene (el pipeline no falla). Si existe y todo está bien, no se envía nada por esta tarea.
+2. Copia el CSV al workspace (`sudo cat`) y **elimina las filas** cuya columna `TIPO_LIQUIDADOR` valga `Liquidador externo`
+   (sin distinguir mayúsculas, ignorando espacios y comillas). Genera `sin_aprobado_limpio.csv` (se archiva como artefacto del build).
+   **El original en el servidor no se modifica** (por ahora, solo prueba).
+3. Busca los PDF `*_SIN_APROBADO_*_<AAAAMMDD>.pdf` en la misma ruta y cuenta cuántos hay.
+4. De cada nombre toma el **número del medio** (lo que queda entre `_SIN_APROBADO_` y `_<fecha>.pdf`) y comprueba que exista en la columna
+   `NUMERO_SINIESTRO` del CSV. Los que no estén se reportan en el correo con una tabla `NÚMERO | PDF`.
+- Config (`sinAprobado { }`): `hora`, `textoFijo`, `formatoFechaCsv`, `formatoFechaPdf`, `separador` (hoy `;`), `columnaTipo`, `valorExcluir`, `columnaSiniestro`.
+- Estados: `OK`, `PDF_SIN_REGISTRO`, `CSV_NO_ENCONTRADO`, `ERROR_PROCESO`, `OMITIDO` (no es su hora).
+
+### 5.3 `ENVIOCC` (`procesar_enviocc`)
+
+1. Busca el CSV `*_ENVIOCC_<AAAA-MM-DD>.csv` en `rutaBase/{mes}`. Si no existe → `CSV_NO_ENCONTRADO` (correo, sin fallar).
+2. Copia el CSV y extrae todos los valores de la columna `FILENAMEFIELD`.
+3. Busca en `rutaPdf` (`/Sistema/Proyecto/test/PDF`) los PDF `*_CCTEST_*_<dd_MM_yyyy>.pdf` (fecha **día_mes_año** al final; números iniciales y del medio aleatorios).
+4. **Normaliza** ambos lados quitando los números iniciales y la extensión: `2131231232_CCTEST_123213123213_09_10_2026.pdf` → `CCTEST_123213123213_09_10_2026`.
+5. Compara los dos conjuntos:
+   - **Faltan PDF** (están en la columna, no hay PDF) → acción: **generar ticket (faltan PDF)**.
+   - **Sobran PDF** (hay PDF, no están en la columna) → acción: **generar ticket solicitando el CSV para diferenciar**.
+- En el correo aparece como **una fila más de la tabla** (`COM_ID 67`, `DES`): `OK` si todo coincide, `ERROR` en cualquier otro caso, y debajo una
+  sección `Detalle ENVIOCC` con los nombres que faltan o sobran.
+- Config (`enviocc { }`): `COM_ID`, `DES`, `hora`, `textoCsv`, `formatoFechaCsv`, `separador`, `columna`, `rutaPdf`, `formatoFechaPdf`, `textoPdf`, `extensionPdf`.
+- Estados: `OK`, `DIFERENCIAS`, `CSV_NO_ENCONTRADO`, `RUTA_PDF_NO_ACCESIBLE`, `ERROR_PROCESO`, `OMITIDO`.
+
+### 5.4 Horarios, cron y parámetro `HORA`
+
+- `programar_ejecuciones()` (primera línea del template) arma el cron con las horas únicas de `archivos`, `sinAprobado.hora` y `enviocc.hora`, y
+  registra el parámetro `HORA` con `properties([...])`.
+- Cada tarea corre si `0 <= (referencia - hora) < ventanaMinutos` (tolerancia por si Jenkins arranca tarde). `referencia` es la hora actual o el valor de `HORA`.
+- `HORA` vacío = automático; `TODOS` = ejecuta todo (pruebas); `HH:mm` = simula esa hora. `programar_ejecuciones()` valida el parámetro
+  y las horas de la config (`HH:mm`, 0-23:0-59) y falla con un mensaje claro antes de conectarse por SSH.
+- `diasAtras` (0 = hoy, 1 = ayer) mueve la fecha de las **tres** tareas; sirve para probar con archivos de días anteriores. Producción: `0`.
+
+### 5.5 Correo único (`enviar_correo_resultados(resultados, sa, ec)`)
+
+1. **Tabla de estatus** `COM_ID | DESCRIPCION | ESTATUS`: las validaciones + la fila de ENVIOCC.
+2. **Sección `Validación SIN_APROBADO`**: solo si hay algo que reportar (CSV no encontrado, PDF sin registro o error).
+3. **Sección `Detalle ENVIOCC`**: solo si ENVIOCC terminó en error.
+- Se envía si hay validaciones que reportar, o `SIN_APROBADO` tiene algo, o ENVIOCC corrió.
+- Cada tarea tiene su propio `try/catch` en el template: si una falla por error técnico, aparece como `ERROR_PROCESO` en el correo y el build queda amarillo, sin perder el resto.
+
+## 6. Decisiones tomadas y supuestos
+
+- Las tareas nuevas viven **dentro de la misma librería** (`validacion_horarios`) como bloques anidados, no como librerías aparte, para compartir conexión y rutas.
+- Los CSV se procesan en una **copia local**; no se escribe nada en el servidor.
+- Se **borran filas**, no columnas, con `Liquidador externo` (el requisito original decía "borrar la columna" y luego "borrar la fila"; se implementó la fila).
+- Todo el procesamiento de CSV usa `awk` con separador fijo (`separador` en la config).
+- Los dos pipelines comparten la librería `notificacion_correo` (destinatarios, prefijo y sufijo del asunto).
+
+## 7. Puntos a confirmar / mejoras pendientes
+
+1. **`SIN_APROBADO` y filas excluidas:** la comparación usa solo las filas que **quedan** tras borrar `Liquidador externo`. Un PDF cuyo número pertenezca a una fila borrada se reportará como "no encontrado". Decidir si debe compararse contra el CSV completo.
+2. **Escribir sobre el CSV original** (hoy solo copia). Requiere permiso de escritura como `usr_datos` en sudoers y conviene guardar un respaldo antes.
+3. **CSV complejos:** `awk` no entiende campos entrecomillados que contengan el separador. Si aparece, pasar a Python.
+   (El BOM del encabezado sí se tolera: el `gsub(/[^A-Za-z0-9_]/, ...)` lo quita antes de buscar la columna.)
+4. **Comparación de números como texto:** `0342432` y `342432` no coinciden (ceros a la izquierda).
+5. ~~Con `estadoSiFaltan = 'FAILURE'` no se enviaba correo~~ → resuelto: se usa `currentBuild.result` en vez de `error` (ver §3.6).
+6. **`SIN_APROBADO` con 0 PDF** solo se ve en el log; no genera aviso. Y no aparece en la tabla de estatus (ENVIOCC sí); se puede agregar con su propio `COM_ID`.
+7. **Varios CSV que coincidan:** se usa el primero (el log lo advierte).
+8. **Nombres en las rutas específicas del pipeline 1:** en algún momento se mencionó `REPORTE{fecha}.csv_*` (números después del `.csv`); la config actual usa `REPORTE_{fecha}_*.csv`. Confirmar el nombre real.
+9. **Pipeline 1 busca la fecha de "ayer":** el lunes busca el domingo. Si no se generan archivos en fin de semana, usar el último día hábil.
+10. **Duplicación:** `buscar()`, el cálculo de hora y el armado de fechas están repetidos en varios steps. Candidato a refactor (librería o step común) y a unificar los dos steps de correo.
+11. **`properties([...])` en el template** reemplaza los triggers/parámetros definidos en la interfaz del job, y se registra la primera vez que el job corre: tras cambiar horas hay que lanzarlo una vez a mano.
+12. Si Jenkins tarda en arrancar más de `ventanaMinutos`, esa validación no se ejecuta ese día (subir la ventana si pasa).
+13. **Ventanas solapadas:** si dos horas distintas están a menos de `ventanaMinutos` (ej. 15:00 y 15:10), la ejecución de la segunda repite
+    las tareas de la primera y se envían dos correos. Hoy no pasa porque todo está a las 15:00.
+14. **`buscar()` y permisos:** `test -d` no comprueba lectura y el `ssh … | while` oculta el código de salida de `ls`; una carpeta sin
+    permiso de lectura se reporta como "no encontrado" en vez de "ruta no accesible". Además hace 2 conexiones SSH por búsqueda.
+15. **ENVIOCC con muchos PDF:** la comparación `findAll { contains }` es cuadrática y lenta en CPS; usar `Set`.
+16. Menores: `.pdf` fijo en minúscula en SIN_APROBADO; HTML del correo sin escapar; `estadoSiFaltan` sin lista de valores permitidos en
+    `library_config`; `log_rotator` declarado pero sin usar; `pipeline_template` de ambos configs pendiente de ajustar a la ruta real.
+
+## 8. Cómo probar
+
+- Commit y push del repo y ejecutar el job una vez a mano (registra cron y parámetro).
+- Pipeline 2: lanzar con `HORA = TODOS` para ejecutar las tres tareas sin esperar a las 15:00.
+- Para probar con archivos de otro día: cambiar `diasAtras`.
+- Si todos los archivos aparecen "no encontrados": probar a mano desde el nodo
+  `ssh svc_jenkins@<ip> "sudo -n -u usr_datos ls -1 <ruta>"`. Si dice `a password is required`, falta el sudoers.
+- Errores de JTE `field '...' is not used` → falta declarar el campo en `library_config.groovy`. `No such DSL method` → falta la librería en la config.
+
+## 9. Cómo trabajar en este repo (instrucciones para Claude Code)
+
+- Mantén la separación: **config = valores, librería = lógica, template = orquestación**.
+- Antes de agregar un campo, añádelo a la config **y** a `library_config.groovy` (incluidos los bloques anidados).
+- No pongas valores literales (IP, rutas, nombres de archivo, formatos de fecha) dentro de los steps.
+- Conserva el formato de log con ✅ / ❌ y el resumen final; los errores técnicos devuelven `ERROR_PROCESO`, no rompen el pipeline.
+- Respeta el shebang `"""#!/bin/sh` en los `sh` con bucles y el escape `\\` / `\$f` dentro de los strings de Groovy.
+- Si cambias el contrato de datos (claves de los mapas que devuelven los steps), actualiza también el step de correo y este documento.
+- No hay Jenkins disponible en el entorno de desarrollo para ejecutar los pipelines: revisa la sintaxis con cuidado y explica cómo probar cada cambio.

@@ -1,0 +1,2 @@
+# Jenkins corre en Linux: los scripts con #!/bin/sh no deben llevar CRLF
+* text=auto eol=lf
