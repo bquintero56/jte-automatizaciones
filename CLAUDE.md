@@ -28,7 +28,7 @@ Todo vive en el repo `jte-automatizaciones`; en Jenkins cada fuente JTE apunta a
 - El **nombre del bloque** en `pipeline_config.groovy` = **nombre de la carpeta** de la librería (`validacion_archivos`,
   `validacion_horarios`, `notificacion_correo`). Si difiere una letra, JTE no la carga.
 - El **nombre del archivo** de un step es el nombre con que se llama en el template (`validar_archivos.groovy` → `validar_archivos()`).
-- Dentro de un step, `config` es el bloque de configuración de **esa** librería (`config.host`, `config.sinAprobado.hora`...).
+- Dentro de un step, `config` es el bloque de configuración de **esa** librería (`config.host`, `config.sinAprobado.textoFijo`...).
 - `execution.time`, `execution.units` y `jenkins_agent_label` vienen de la sección `keywords` de la configuración.
 - **Todo campo de la config debe estar declarado en `library_config.groovy`** o JTE falla con
   `field 'x' is not used`. Los bloques anidados (`sinAprobado { }`, `enviocc { }`) se declaran anidados también.
@@ -47,9 +47,7 @@ jte-automations-pipeline-libraries/
 ├── validacion_horarios/                      (pipeline 2)
 │   ├── library_config.groovy
 │   └── steps/
-│       ├── programar_ejecuciones.groovy      cron + parámetro HORA
-│       ├── horas_programadas.groovy          horas únicas de las tres tareas
-│       ├── franja_horaria.groovy             qué franja toca en esta ejecución
+│       ├── programar_ejecuciones.groovy      cron diario (config.hora)
 │       ├── validar_archivos_horario.groovy   las 10 validaciones
 │       ├── procesar_sin_aprobado.groovy      tarea SIN_APROBADO
 │       └── procesar_enviocc.groovy           tarea ENVIOCC
@@ -114,15 +112,14 @@ Un archivo queda `OK` solo si está en **las dos** rutas; si falta en cualquiera
 
 ## 5. Pipeline 2 – `validar-archivos-horarios`
 
-Un solo job y **un solo correo al final**. Cada tarea decide si le toca correr según la hora (ver 5.4) y el correo se envía cuando hay algo
-que reportar. Actualmente **todas las tareas están a las 15:00**.
+Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/Santiago`) que corre las tres tareas, y **un solo correo al final**.
 
 ### 5.1 Las 10 validaciones (`validar_archivos_horario`)
 
 - Busca cada archivo en `rutaBase` con `{mes}` = `AAAAMM` del día de ejecución (ej. `/Proyecto/M/BACKUP/202610`; en noviembre pasa solo a `202611`).
 - Nombre buscado: `prefijoNombre + nombre` con `{fecha}` reemplazada (ej. `*_DEVOLUCION_2026-10-09.csv`). Todos los archivos llevan
   números aleatorios al inicio, por eso `prefijoNombre = '*_'`.
-- Cada archivo de la config lleva: `COM_ID` (ID numérico), `DES` (descripción), `nombre` y `hora`. Opcional: `ruta` para sobrescribir `rutaBase`.
+- Cada archivo de la config lleva: `COM_ID` (ID numérico), `DES` (descripción) y `nombre`. Opcional: `ruta` para sobrescribir `rutaBase`.
 - Resultado por archivo: `[comId, descripcion, proceso, archivo, estatus, fecha]`.
 
 ### 5.2 `SIN_APROBADO` (`procesar_sin_aprobado`)
@@ -135,8 +132,8 @@ que reportar. Actualmente **todas las tareas están a las 15:00**.
 3. Busca los PDF `*_SIN_APROBADO_*_<AAAAMMDD>.pdf` en la misma ruta y cuenta cuántos hay.
 4. De cada nombre toma el **número del medio** (lo que queda entre `_SIN_APROBADO_` y `_<fecha>.pdf`) y comprueba que exista en la columna
    `NUMERO_SINIESTRO` del CSV. Los que no estén se reportan en el correo con una tabla `NÚMERO | PDF`.
-- Config (`sinAprobado { }`): `hora`, `textoFijo`, `formatoFechaCsv`, `formatoFechaPdf`, `separador` (hoy `;`), `columnaTipo`, `valorExcluir`, `columnaSiniestro`.
-- Estados: `OK`, `PDF_SIN_REGISTRO`, `CSV_NO_ENCONTRADO`, `ERROR_PROCESO`, `OMITIDO` (no es su hora).
+- Config (`sinAprobado { }`): `textoFijo`, `formatoFechaCsv`, `formatoFechaPdf`, `separador` (hoy `;`), `columnaTipo`, `valorExcluir`, `columnaSiniestro`.
+- Estados: `OK`, `PDF_SIN_REGISTRO`, `CSV_NO_ENCONTRADO`, `ERROR_PROCESO`.
 
 ### 5.3 `ENVIOCC` (`procesar_enviocc`)
 
@@ -149,20 +146,17 @@ que reportar. Actualmente **todas las tareas están a las 15:00**.
    - **Sobran PDF** (hay PDF, no están en la columna) → acción: **generar ticket solicitando el CSV para diferenciar**.
 - En el correo aparece como **una fila más de la tabla** (`COM_ID 67`, `DES`): `OK` si todo coincide, `ERROR` en cualquier otro caso, y debajo una
   sección `Detalle ENVIOCC` con los nombres que faltan o sobran.
-- Config (`enviocc { }`): `COM_ID`, `DES`, `hora`, `textoCsv`, `formatoFechaCsv`, `separador`, `columna`, `rutaPdf`, `formatoFechaPdf`, `textoPdf`, `extensionPdf`.
-- Estados: `OK`, `DIFERENCIAS`, `CSV_NO_ENCONTRADO`, `RUTA_PDF_NO_ACCESIBLE`, `ERROR_PROCESO`, `OMITIDO`.
+- Config (`enviocc { }`): `COM_ID`, `DES`, `textoCsv`, `formatoFechaCsv`, `separador`, `columna`, `rutaPdf`, `formatoFechaPdf`, `textoPdf`, `extensionPdf`.
+- Estados: `OK`, `DIFERENCIAS`, `CSV_NO_ENCONTRADO`, `RUTA_PDF_NO_ACCESIBLE`, `ERROR_PROCESO`.
 
-### 5.4 Horarios, cron y parámetro `HORA`
+### 5.4 Horario y cron
 
-- `programar_ejecuciones()` (primera línea del template) arma el cron con `horas_programadas()` (horas únicas de `archivos`,
-  `sinAprobado.hora` y `enviocc.hora`) y registra el parámetro `HORA` con `properties([...])`.
-- **Franja horaria:** el template llama **una vez** a `franja_horaria(params.HORA)` (stage `Horario: calcular franja`) y pasa el mapa
-  `[todos, referencia, horas]` a los tres steps (`validar_archivos_horario(franja)`, `procesar_sin_aprobado(franja)`, `procesar_enviocc(franja)`).
-  La franja es la hora programada **más reciente** con `0 <= (referencia - hora) < ventanaMinutos`; una tarea corre si `franja.todos` o si su
-  `hora` está en `franja.horas`. Así, con tareas a las 15:00 y 15:10, la ejecución de las 15:10 no repite las de las 15:00, y las tres tareas
-  usan la misma referencia aunque una tarde varios minutos. `referencia` es la hora actual o el valor de `HORA`.
-- `HORA` vacío = automático; `TODOS` = ejecuta todo (pruebas); `HH:mm` = simula esa hora. `programar_ejecuciones()` valida el parámetro
-  y las horas de la config (`HH:mm`, 0-23:0-59) y falla con un mensaje claro antes de conectarse por SSH.
+- **Una sola hora para todo el job:** `hora = '15:00'` en la config, interpretada en `zonaHoraria = 'America/Santiago'` (hora de Chile; el
+  cron con `TZ=` respeta el horario de verano). Las tareas **no** tienen hora propia.
+- `programar_ejecuciones()` (primera línea del template) valida `hora` (`HH:mm`) y registra el cron con `properties([pipelineTriggers([cron(...)])])`.
+- **Cada ejecución valida todo** (10 archivos + `SIN_APROBADO` + `ENVIOCC`), sea por cron o lanzada a mano: para probar basta con *Build*.
+- Historial: hasta el commit `993df4c` había horas por tarea, `ventanaMinutos`, `franja_horaria()` y el parámetro `HORA`; se quitaron al
+  cambiar el requerimiento a una única ejecución diaria.
 - `diasAtras` (0 = hoy, 1 = ayer) mueve la fecha de las **tres** tareas; sirve para probar con archivos de días anteriores. Producción: `0`.
 
 ### 5.5 Correo único (`enviar_correo_resultados(resultados, sa, ec)`)
@@ -170,7 +164,7 @@ que reportar. Actualmente **todas las tareas están a las 15:00**.
 1. **Tabla de estatus** `COM_ID | DESCRIPCION | ESTATUS`: las validaciones + la fila de ENVIOCC.
 2. **Sección `Validación SIN_APROBADO`**: solo si hay algo que reportar (CSV no encontrado, PDF sin registro o error).
 3. **Sección `Detalle ENVIOCC`**: solo si ENVIOCC terminó en error.
-- Se envía si hay validaciones que reportar, o `SIN_APROBADO` tiene algo, o ENVIOCC corrió.
+- Se envía en cada ejecución (siempre hay validaciones que reportar).
 - Cada tarea tiene su propio `try/catch` en el template: si una falla por error técnico, aparece como `ERROR_PROCESO` en el correo y el build queda amarillo, sin perder el resto.
 
 ## 6. Decisiones tomadas y supuestos
@@ -193,11 +187,10 @@ que reportar. Actualmente **todas las tareas están a las 15:00**.
 7. **Varios CSV que coincidan:** se usa el primero (el log lo advierte).
 8. **Nombres en las rutas específicas del pipeline 1:** en algún momento se mencionó `REPORTE{fecha}.csv_*` (números después del `.csv`); la config actual usa `REPORTE_{fecha}_*.csv`. Confirmar el nombre real.
 9. **Pipeline 1 busca la fecha de "ayer":** el lunes busca el domingo. Si no se generan archivos en fin de semana, usar el último día hábil.
-10. **Duplicación:** `buscar()` y el armado de fechas están repetidos en varios steps (el cálculo de hora ya está centralizado en `franja_horaria()`). Candidato a refactor (librería o step común) y a unificar los dos steps de correo.
-11. **`properties([...])` en el template** reemplaza los triggers/parámetros definidos en la interfaz del job, y se registra la primera vez que el job corre: tras cambiar horas hay que lanzarlo una vez a mano.
-12. Si Jenkins tarda en arrancar más de `ventanaMinutos`, esa validación no se ejecuta ese día (subir la ventana si pasa).
-13. ~~Ventanas solapadas (15:00 y 15:10 repetían tareas)~~ → resuelto con `franja_horaria()` (ver §5.4). Límite que queda: si la ejecución
-    de las 15:00 arranca después de las 15:10, cae en la franja 15:10 y las tareas de las 15:00 no corren ese día.
+10. **Duplicación:** `buscar()` y el armado de fechas están repetidos en varios steps. Candidato a refactor (librería o step común) y a unificar los dos steps de correo.
+11. **`properties([...])` en el template** reemplaza los triggers/parámetros definidos en la interfaz del job, y se registra la primera vez que el job corre: tras cambiar la hora hay que lanzarlo una vez a mano.
+12. ~~Ventana de tolerancia~~ → ya no aplica: con una sola hora, cada ejecución valida todo aunque Jenkins arranque tarde.
+13. ~~Ventanas solapadas~~ → ya no aplica (una sola hora, ver §5.4).
 14. ~~`buscar()` ocultaba el fallo de `ls` y hacía 2 conexiones SSH~~ → resuelto: una conexión y el `rc` de `ls` decide (ver §3.3).
     Pendiente opcional: distinguir en log/correo "no existe" / "sin permiso" / "falló el SSH" (hoy todo es "ruta no accesible").
 15. ~~ENVIOCC con comparación cuadrática~~ → resuelto: `contains` sobre `HashSet`.
@@ -206,8 +199,8 @@ que reportar. Actualmente **todas las tareas están a las 15:00**.
 
 ## 8. Cómo probar
 
-- Commit y push del repo y ejecutar el job una vez a mano (registra cron y parámetro).
-- Pipeline 2: lanzar con `HORA = TODOS` para ejecutar las tres tareas sin esperar a las 15:00.
+- Commit y push del repo y ejecutar el job una vez a mano (registra el cron).
+- Pipeline 2: cualquier ejecución manual (*Build*) corre las tres tareas, sin esperar a las 15:00.
 - Para probar con archivos de otro día: cambiar `diasAtras`.
 - Si todos los archivos aparecen "no encontrados": probar a mano desde el nodo
   `ssh svc_jenkins@<ip> "sudo -n -u usr_datos ls -1 <ruta>"`. Si dice `a password is required`, falta el sudoers.

@@ -1,15 +1,8 @@
-// franja: resultado de franja_horaria() → [todos, referencia, horas]
-Map call(Map franja) {
+Map call() {
     def c         = config.sinAprobado
     def host      = config.host
     def user      = config.user
     def runAsUser = config.runAsUser
-
-    // ¿Le toca correr en esta franja?
-    if (!franja.todos && !franja.horas.contains(c.hora)) {
-        echo "SIN_APROBADO está programado a las ${c.hora}; referencia ${franja.referencia}, se omite"
-        return [estado: 'OMITIDO']
-    }
 
     // Fechas y mes (respetan diasAtras)
     def datos = sh(

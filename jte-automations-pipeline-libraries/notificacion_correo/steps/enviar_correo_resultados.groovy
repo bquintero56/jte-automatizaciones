@@ -2,7 +2,7 @@ void call(List resultados, Map sa = [:], Map ec = [:]) {
     def haySA = (sa.estado == 'CSV_NO_ENCONTRADO' || sa.estado == 'PDF_SIN_REGISTRO' || sa.estado == 'ERROR_PROCESO')
 
     // ENVIOCC corrió en esta ejecución (aparece en la tabla) / tiene algo que detallar
-    def ecEjecuto = (ec.estado && ec.estado != 'OMITIDO')
+    def ecEjecuto = (ec.estado as boolean)
     def hayEC = (ec.estado == 'CSV_NO_ENCONTRADO' || ec.estado == 'RUTA_PDF_NO_ACCESIBLE' ||
                  ec.estado == 'DIFERENCIAS' || ec.estado == 'ERROR_PROCESO')
 

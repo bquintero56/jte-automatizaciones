@@ -1,5 +1,4 @@
-// franja: resultado de franja_horaria() → [todos, referencia, horas]
-List call(Map franja) {
+List call() {
     def host      = config.host
     def user      = config.user
     def runAsUser = config.runAsUser
@@ -19,19 +18,9 @@ date -d '${config.diasAtras} days ago' +'${config.formatoMes}'
     def fecha = datos[0]
     def mes   = datos[1]
 
-    // Qué archivos tocan en esta ejecución
-    def seleccion = config.archivos.findAll { item ->
-        franja.todos || franja.horas.contains(item.hora)
-    }
+    def seleccion = config.archivos
 
-    echo "Fecha: ${fecha} | Mes: ${mes} | Referencia: ${franja.todos ? 'TODOS' : franja.referencia}"
-
-    if (!seleccion) {
-        echo "No hay validaciones programadas para las ${franja.referencia} (ventana de ${config.ventanaMinutos} min)"
-        return []
-    }
-
-    echo "Validaciones a ejecutar: ${seleccion.size()}"
+    echo "Fecha: ${fecha} | Mes: ${mes} | Validaciones a ejecutar: ${seleccion.size()}"
 
     // Busca en una ruta los archivos que coinciden con el patrón.
     // Devuelve null si la ruta no es accesible, o la lista de coincidencias (vacía si no hay).
@@ -80,14 +69,14 @@ done < buscar_listado.txt
         def ok = false
 
         if (encontrados == null) {
-            echo "❌ [${item.hora}] Ruta no accesible: ${ruta}"
-            faltantes << "[${item.hora}] ${ruta}/${nombre} (ruta no accesible)"
+            echo "❌ [COM_ID ${item.COM_ID ?: '-'}] Ruta no accesible: ${ruta}"
+            faltantes << "[COM_ID ${item.COM_ID ?: '-'}] ${ruta}/${nombre} (ruta no accesible)"
         } else if (encontrados) {
-            echo "✅ [${item.hora}] ${ruta}/${encontrados[0]}"
+            echo "✅ [COM_ID ${item.COM_ID ?: '-'}] ${ruta}/${encontrados[0]}"
             ok = true
         } else {
-            echo "❌ [${item.hora}] No encontrado: ${ruta}/${nombre}"
-            faltantes << "[${item.hora}] ${ruta}/${nombre}"
+            echo "❌ [COM_ID ${item.COM_ID ?: '-'}] No encontrado: ${ruta}/${nombre}"
+            faltantes << "[COM_ID ${item.COM_ID ?: '-'}] ${ruta}/${nombre}"
         }
 
         resultados << [

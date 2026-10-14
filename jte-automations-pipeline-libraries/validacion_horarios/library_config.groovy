@@ -10,11 +10,10 @@ fields {
         formatoFecha   = String
         prefijoNombre  = String
         diasAtras      = Integer
-        ventanaMinutos = Integer
+        hora           = String
         archivos       = List
 
         sinAprobado {
-            hora             = String
             textoFijo        = String
             formatoFechaCsv  = String
             formatoFechaPdf  = String
@@ -27,7 +26,6 @@ fields {
         enviocc {
             COM_ID          = String
             DES             = String
-            hora            = String
             textoCsv        = String
             formatoFechaCsv = String
             separador       = String

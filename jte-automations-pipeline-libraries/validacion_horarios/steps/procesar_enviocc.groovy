@@ -1,16 +1,9 @@
-// franja: resultado de franja_horaria() → [todos, referencia, horas]
-Map call(Map franja) {
+Map call() {
     def c         = config.enviocc
     def host      = config.host
     def user      = config.user
     def runAsUser = config.runAsUser
     def titulo    = c.textoCsv
-
-    // ¿Le toca correr en esta franja?
-    if (!franja.todos && !franja.horas.contains(c.hora)) {
-        echo "ENVIOCC está programado a las ${c.hora}; referencia ${franja.referencia}, se omite"
-        return [estado: 'OMITIDO']
-    }
 
     // Datos que van en todos los resultados (para la fila de la tabla del correo)
     def base = [titulo: titulo, comId: c.COM_ID, descripcion: c.DES]

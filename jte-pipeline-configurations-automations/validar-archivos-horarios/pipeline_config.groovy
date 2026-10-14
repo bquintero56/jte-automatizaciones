@@ -17,7 +17,7 @@ libraries {
         host           = '10.20.30.40'
         user           = 'svc_jenkins'
         runAsUser      = 'usr_datos'
-        zonaHoraria    = 'America/Bogota'
+        zonaHoraria    = 'America/Santiago'     // cron y fechas en hora de Chile
         estadoSiFaltan = 'SUCCESS'              // SUCCESS, UNSTABLE o FAILURE
 
         // Ruta con parte variable: {mes} se reemplaza por AAAAMM (202610, 202611...)
@@ -28,30 +28,29 @@ libraries {
         formatoFecha   = '%Y-%m-%d'             // 2026-10-07
         diasAtras      = 0                      // 0 = hoy, 1 = ayer (para pruebas; compartido por los 3 procesos)
 
-        // Tolerancia: el job puede arrancar hasta N minutos después de la hora
-        ventanaMinutos = 20
+        // Ejecución diaria: valida todo (10 archivos + SIN_APROBADO + ENVIOCC) y envía un solo correo
+        hora           = '15:00'                // HH:mm en zonaHoraria
 
         // Todos los archivos llevan números + "_" al inicio
         prefijoNombre  = '*_'
 
         // AJUSTAR: nombres, COM_ID y DES (descripción) reales de cada archivo
         archivos = [
-            [COM_ID: '23', DES: 'Descripción de devoluciones', nombre: 'DEVOLUCION_{fecha}.csv', hora: '15:00'],
-            [COM_ID: '24', DES: 'Descripción del contador',    nombre: 'CONTADOR_{fecha}.csv',   hora: '15:00'],
-            [COM_ID: '25', DES: 'Descripción archivo 3',       nombre: 'ARCHIVO_3_{fecha}.csv',  hora: '15:00'],
-            [COM_ID: '26', DES: 'Descripción archivo 4',       nombre: 'ARCHIVO_4_{fecha}.csv',  hora: '15:00'],
-            [COM_ID: '27', DES: 'Descripción archivo 5',       nombre: 'ARCHIVO_5_{fecha}.csv',  hora: '15:00'],
-            [COM_ID: '28', DES: 'Descripción archivo 6',       nombre: 'ARCHIVO_6_{fecha}.csv',  hora: '15:00'],
-            [COM_ID: '29', DES: 'Descripción archivo 7',       nombre: 'ARCHIVO_7_{fecha}.csv',  hora: '15:00'],
-            [COM_ID: '30', DES: 'Descripción archivo 8',       nombre: 'ARCHIVO_8_{fecha}.csv',  hora: '15:00'],
-            [COM_ID: '31', DES: 'Descripción archivo 9',       nombre: 'ARCHIVO_9_{fecha}.csv',  hora: '15:00'],
-            [COM_ID: '32', DES: 'Descripción archivo 10',      nombre: 'ARCHIVO_10_{fecha}.csv', hora: '15:00']
+            [COM_ID: '23', DES: 'Descripción de devoluciones', nombre: 'DEVOLUCION_{fecha}.csv'],
+            [COM_ID: '24', DES: 'Descripción del contador',    nombre: 'CONTADOR_{fecha}.csv'],
+            [COM_ID: '25', DES: 'Descripción archivo 3',       nombre: 'ARCHIVO_3_{fecha}.csv'],
+            [COM_ID: '26', DES: 'Descripción archivo 4',       nombre: 'ARCHIVO_4_{fecha}.csv'],
+            [COM_ID: '27', DES: 'Descripción archivo 5',       nombre: 'ARCHIVO_5_{fecha}.csv'],
+            [COM_ID: '28', DES: 'Descripción archivo 6',       nombre: 'ARCHIVO_6_{fecha}.csv'],
+            [COM_ID: '29', DES: 'Descripción archivo 7',       nombre: 'ARCHIVO_7_{fecha}.csv'],
+            [COM_ID: '30', DES: 'Descripción archivo 8',       nombre: 'ARCHIVO_8_{fecha}.csv'],
+            [COM_ID: '31', DES: 'Descripción archivo 9',       nombre: 'ARCHIVO_9_{fecha}.csv'],
+            [COM_ID: '32', DES: 'Descripción archivo 10',      nombre: 'ARCHIVO_10_{fecha}.csv']
             // Opcional por archivo: ruta: '/OTRA/RUTA/{mes}' para sobrescribir rutaBase
         ]
 
         // Tarea SIN_APROBADO (CSV y PDFs están en rutaBase)
         sinAprobado {
-            hora             = '15:00'
             textoFijo        = '_SIN_APROBADO_'
             formatoFechaCsv  = '%Y-%m-%d'       // 2026-10-08
             formatoFechaPdf  = '%Y%m%d'         // 20261008
@@ -65,7 +64,6 @@ libraries {
         enviocc {
             COM_ID          = '67'
             DES             = 'Descripción de ENVIOCC'     // texto que se ve en la tabla del correo
-            hora            = '15:00'
             textoCsv        = 'ENVIOCC'
             formatoFechaCsv = '%Y-%m-%d'          // 2026-10-09
             separador       = ','                 // separador del CSV (',' o ';')

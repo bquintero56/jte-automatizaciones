@@ -1,8 +1,8 @@
 def resultados  = []
 def resultadoSA = [:]
 def resultadoEC = [:]
-def franja      = [:]
 
+// Cron diario a la hora de la config (hora + zonaHoraria): cada ejecución valida todo
 programar_ejecuciones()
 
 timeout(time: execution.time, unit: execution.units) {
@@ -10,18 +10,13 @@ timeout(time: execution.time, unit: execution.units) {
     node(jenkins_agent_label) {
         withFolderProperties {
             try {
-                stage('Horario: calcular franja') {
-                    // Una sola vez para las tres tareas: todas usan la misma referencia
-                    franja = franja_horaria(params.HORA)
-                }
-
                 stage('SSH: validar archivos') {
-                    resultados = validar_archivos_horario(franja)
+                    resultados = validar_archivos_horario()
                 }
 
                 stage('SIN_APROBADO: validar y procesar') {
                     try {
-                        resultadoSA = procesar_sin_aprobado(franja)
+                        resultadoSA = procesar_sin_aprobado()
                     }
                     catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
                         throw e     // aborto manual o timeout: no se convierte en ERROR_PROCESO
@@ -35,7 +30,7 @@ timeout(time: execution.time, unit: execution.units) {
 
                 stage('ENVIOCC: validar y comparar') {
                     try {
-                        resultadoEC = procesar_enviocc(franja)
+                        resultadoEC = procesar_enviocc()
                     }
                     catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
                         throw e     // aborto manual o timeout: no se convierte en ERROR_PROCESO
@@ -51,7 +46,7 @@ timeout(time: execution.time, unit: execution.units) {
                     def haySA = (resultadoSA.estado == 'CSV_NO_ENCONTRADO' ||
                                  resultadoSA.estado == 'PDF_SIN_REGISTRO' ||
                                  resultadoSA.estado == 'ERROR_PROCESO')
-                    def ecEjecuto = (resultadoEC.estado && resultadoEC.estado != 'OMITIDO')
+                    def ecEjecuto = (resultadoEC.estado as boolean)
 
                     if (resultados || haySA || ecEjecuto) {
                         enviar_correo_resultados(resultados, resultadoSA, resultadoEC)
