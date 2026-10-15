@@ -138,6 +138,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 ### 5.3 `ENVIOCC` (`procesar_enviocc`)
 
 1. Busca el CSV `*_ENVIOCC_<AAAA-MM-DD>.csv` en `rutaBase/{mes}`. Si no existe → `CSV_NO_ENCONTRADO` (correo, sin fallar).
+   Si hay **varios**, usa el **más reciente** por fecha de modificación (`buscar()` de este step lista con `ls -1t`); el log muestra todos.
 2. Copia el CSV y extrae todos los valores de la columna `FILENAMEFIELD`.
 3. Busca en `rutaPdf` (`/Sistema/Proyecto/test/PDF`) los PDF `*_CCTEST_*_<dd_MM_yyyy>.pdf` (fecha **día_mes_año** al final; números iniciales y del medio aleatorios).
 4. **Normaliza** ambos lados quitando los números iniciales y la extensión: `2131231232_CCTEST_123213123213_09_10_2026.pdf` → `CCTEST_123213123213_09_10_2026`.
@@ -184,7 +185,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 4. **Comparación de números como texto:** `0342432` y `342432` no coinciden (ceros a la izquierda).
 5. ~~Con `estadoSiFaltan = 'FAILURE'` no se enviaba correo~~ → resuelto: se usa `currentBuild.result` en vez de `error` (ver §3.6).
 6. **`SIN_APROBADO` con 0 PDF** solo se ve en el log; no genera aviso. Y no aparece en la tabla de estatus (ENVIOCC sí); se puede agregar con su propio `COM_ID`.
-7. **Varios CSV que coincidan:** se usa el primero (el log lo advierte).
+7. **Varios CSV que coincidan:** ENVIOCC usa el más reciente (`ls -1t`). SIN_APROBADO todavía usa el primero en orden alfabético (el log lo advierte).
 8. **Nombres en las rutas específicas del pipeline 1:** en algún momento se mencionó `REPORTE{fecha}.csv_*` (números después del `.csv`); la config actual usa `REPORTE_{fecha}_*.csv`. Confirmar el nombre real.
 9. **Pipeline 1 busca la fecha de "ayer":** el lunes busca el domingo. Si no se generan archivos en fin de semana, usar el último día hábil.
 10. **Duplicación:** `buscar()` y el armado de fechas están repetidos en varios steps. Candidato a refactor (librería o step común) y a unificar los dos steps de correo.
