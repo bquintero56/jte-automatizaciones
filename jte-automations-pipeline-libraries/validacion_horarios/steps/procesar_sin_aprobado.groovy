@@ -32,12 +32,13 @@ date -d '${config.diasAtras} days ago' +'${config.formatoMes}'
     // Busca en una ruta los archivos que coinciden con el patrón.
     // Devuelve null si la ruta no es accesible, o la lista de coincidencias (vacía si no hay).
     def buscar = { String rutaBuscar, String patron ->
-        // Una sola conexión: lista la carpeta en un archivo local; el rc indica si la ruta es accesible
+        // Una sola conexión: lista la carpeta en un archivo local; el rc indica si la ruta es accesible.
+        // ls -1t ordena del más reciente al más antiguo (fecha de modificación): la primera coincidencia es la última creada.
         def rc = sh(
             returnStatus: true,
             script: """#!/bin/sh
 ssh -o StrictHostKeyChecking=no ${user}@${host} \\
-    "sudo -n -u ${runAsUser} test -d '${rutaBuscar}' && sudo -n -u ${runAsUser} ls -1 '${rutaBuscar}'" > buscar_listado.txt
+    "sudo -n -u ${runAsUser} test -d '${rutaBuscar}' && sudo -n -u ${runAsUser} ls -1t '${rutaBuscar}'" > buscar_listado.txt
 """
         )
         if (rc != 0) {
@@ -79,7 +80,8 @@ done < buscar_listado.txt
     def nombreCsv = csvs[0]
     echo "✅ CSV encontrado: ${ruta}/${nombreCsv}"
     if (csvs.size() > 1) {
-        echo "⚠️ Hay ${csvs.size()} CSV que coinciden, se usa el primero: ${csvs.join(', ')}"
+        echo "⚠️ Hay ${csvs.size()} CSV que coinciden (del más reciente al más antiguo): ${csvs.join(', ')}"
+        echo "   Se usa el más reciente: ${nombreCsv}"
     }
 
     // ---------- 2) Copia local del CSV ----------

@@ -126,6 +126,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 
 1. Busca el CSV `*_SIN_APROBADO_<AAAA-MM-DD>.csv` en `rutaBase/{mes}`. Si **no existe** → estado `CSV_NO_ENCONTRADO`, se informa por correo y la
    tarea se detiene (el pipeline no falla). Si existe y todo está bien, no se envía nada por esta tarea.
+   Si hay **varios** CSV, usa el **más reciente** por fecha de modificación (`ls -1t`); el log muestra todos.
 2. Copia el CSV al workspace (`sudo cat`) y **elimina las filas** cuya columna `TIPO_LIQUIDADOR` valga `Liquidador externo`
    (sin distinguir mayúsculas, ignorando espacios y comillas). Genera `sin_aprobado_limpio.csv` (se archiva como artefacto del build).
    **El original en el servidor no se modifica** (por ahora, solo prueba).
@@ -185,7 +186,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 4. **Comparación de números como texto:** `0342432` y `342432` no coinciden (ceros a la izquierda).
 5. ~~Con `estadoSiFaltan = 'FAILURE'` no se enviaba correo~~ → resuelto: se usa `currentBuild.result` en vez de `error` (ver §3.6).
 6. **`SIN_APROBADO` con 0 PDF** solo se ve en el log; no genera aviso. Y no aparece en la tabla de estatus (ENVIOCC sí); se puede agregar con su propio `COM_ID`.
-7. **Varios CSV que coincidan:** ENVIOCC usa el más reciente (`ls -1t`). SIN_APROBADO todavía usa el primero en orden alfabético (el log lo advierte).
+7. ~~Varios CSV que coincidan~~ → resuelto: SIN_APROBADO y ENVIOCC usan el más reciente por fecha de modificación (`ls -1t`); el log muestra todos.
 8. **Nombres en las rutas específicas del pipeline 1:** en algún momento se mencionó `REPORTE{fecha}.csv_*` (números después del `.csv`); la config actual usa `REPORTE_{fecha}_*.csv`. Confirmar el nombre real.
 9. **Pipeline 1 busca la fecha de "ayer":** el lunes busca el domingo. Si no se generan archivos en fin de semana, usar el último día hábil.
 10. **Duplicación:** `buscar()` y el armado de fechas están repetidos en varios steps. Candidato a refactor (librería o step común) y a unificar los dos steps de correo.
