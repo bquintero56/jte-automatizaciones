@@ -127,11 +127,14 @@ END { printf "%d %d\\n", removed, kept > "sin_aprobado_stats.txt" }
 '''
     writeFile file: 'sin_aprobado_filtrar.awk', text: awk
 
+    // Copia limpia con el nombre del original + _limpio (ej. 482913_SIN_APROBADO_2026-10-15_limpio.csv); se adjunta al correo
+    def archivoLimpio = nombreCsv.replaceAll(/(?i)\.csv$/, '') + '_limpio.csv'
+
     def rcAwk = sh(
         returnStatus: true,
         script: """#!/bin/sh
 : > sin_aprobado_siniestros.txt
-awk -v sep='${c.separador}' -v colTipo='${c.columnaTipo}' -v colSin='${c.columnaSiniestro}' -v excluir='${c.valorExcluir}' -f sin_aprobado_filtrar.awk sin_aprobado_original.csv > sin_aprobado_limpio.csv
+awk -v sep='${c.separador}' -v colTipo='${c.columnaTipo}' -v colSin='${c.columnaSiniestro}' -v excluir='${c.valorExcluir}' -f sin_aprobado_filtrar.awk sin_aprobado_original.csv > '${archivoLimpio}'
 """
     )
     if (rcAwk != 0) {
@@ -144,7 +147,8 @@ awk -v sep='${c.separador}' -v colTipo='${c.columnaTipo}' -v colSin='${c.columna
     def siniestrosCsv = readFile('sin_aprobado_siniestros.txt').readLines().collect { it.trim() }.findAll { it }
 
     echo "Filas con '${c.valorExcluir}' eliminadas: ${eliminadas} | filas restantes: ${conservadas}"
-    archiveArtifacts artifacts: 'sin_aprobado_limpio.csv', allowEmptyArchive: true
+    echo "📎 Archivo limpio generado: ${archivoLimpio} (se adjunta al correo)"
+    archiveArtifacts artifacts: archivoLimpio, allowEmptyArchive: true
 
     // ---------- 4) PDFs ----------
     echo "Buscando PDFs: ${ruta}/${patronPdf}"
@@ -187,6 +191,8 @@ awk -v sep='${c.separador}' -v colTipo='${c.columnaTipo}' -v colSin='${c.columna
         columnaSiniestro:   c.columnaSiniestro,
         valorExcluir:       c.valorExcluir,
         eliminadas:         eliminadas,
+        conservadas:        conservadas,
+        archivoLimpio:      archivoLimpio,      // en el workspace; lo adjunta enviar_correo_resultados
         totalPdf:           pdfs.size(),
         rutaPdfInaccesible: rutaPdfInaccesible,
         rutaPdf:            ruta,

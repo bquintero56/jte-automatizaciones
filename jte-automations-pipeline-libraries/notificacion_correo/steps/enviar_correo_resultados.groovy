@@ -179,11 +179,20 @@ void call(List resultados, Map sa = [:], Map ec = [:]) {
         ${detalleEC}"""
     }
 
+    // ---------- Adjunto: CSV de SIN_APROBADO sin las filas excluidas ----------
+    def adjunto = ''
+    if (sa.archivoLimpio) {
+        adjunto = """
+        <p style="margin-top:20px;">Se adjunta el archivo <b>${sa.archivoLimpio}</b>: ${sa.titulo ?: 'SIN_APROBADO'} sin las filas con
+        "${sa.valorExcluir}" (${sa.eliminadas} eliminadas, ${sa.conservadas} restantes).</p>"""
+    }
+
     def html = """
     <html>
     <body style="font-family:Arial,sans-serif;font-size:14px;color:#222;">
         <p>Estimados buenos días,</p>
         ${seccion1}
+        ${adjunto}
         ${seccion2}
         ${seccion3}
         <p>Saludos.</p>
@@ -191,11 +200,12 @@ void call(List resultados, Map sa = [:], Map ec = [:]) {
     </html>"""
 
     emailext(
-        to:       config.destinatarios,
-        subject:  "${config.asuntoPrefijo} ${nombres} ${config.asuntoSufijo} - ${fecha}",
-        mimeType: 'text/html',
-        body:     html
+        to:                 config.destinatarios,
+        subject:            "${config.asuntoPrefijo} ${nombres} ${config.asuntoSufijo} - ${fecha}",
+        mimeType:           'text/html',
+        body:               html,
+        attachmentsPattern: sa.archivoLimpio ?: ''     // ruta relativa al workspace; vacío = sin adjunto
     )
 
-    echo "Correo enviado a: ${config.destinatarios}"
+    echo "Correo enviado a: ${config.destinatarios}" + (sa.archivoLimpio ? " | adjunto: ${sa.archivoLimpio}" : '')
 }

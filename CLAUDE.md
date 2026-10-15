@@ -128,7 +128,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
    tarea se detiene (el pipeline no falla). Si existe y todo está bien, no se envía nada por esta tarea.
    Si hay **varios** CSV, usa el **más reciente** por fecha de modificación (`ls -1t`); el log muestra todos.
 2. Copia el CSV al workspace (`sudo cat`) y **elimina las filas** cuya columna `TIPO_LIQUIDADOR` valga `Liquidador externo`
-   (sin distinguir mayúsculas, ignorando espacios y comillas). Genera `sin_aprobado_limpio.csv` (se archiva como artefacto del build).
+   (sin distinguir mayúsculas, ignorando espacios y comillas). Genera `<nombre original>_limpio.csv` (ej. `482913_SIN_APROBADO_2026-10-15_limpio.csv`), que se archiva como artefacto del build y **se adjunta al correo**.
    **El original en el servidor no se modifica** (por ahora, solo prueba).
 3. Busca los PDF `*_SIN_APROBADO_*_<AAAAMMDD>.pdf` en la misma ruta y cuenta cuántos hay.
 4. De cada nombre toma el **número del medio** (lo que queda entre `_SIN_APROBADO_` y `_<fecha>.pdf`) y comprueba que exista en la columna
@@ -167,6 +167,9 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 2. **Sección `Validación SIN_APROBADO`**: solo si hay algo que reportar (CSV no encontrado, PDF sin registro o error).
 3. **Sección `Detalle ENVIOCC`**: solo si ENVIOCC terminó en error.
 - Se envía en cada ejecución (siempre hay validaciones que reportar).
+- **Adjunto:** si SIN_APROBADO generó el CSV limpio (`sa.archivoLimpio`), `emailext` lo adjunta con `attachmentsPattern` (ruta relativa al
+  workspace, por eso el correo se envía antes del `clean_job_workspace()` del `finally`) y el cuerpo lo menciona con las filas eliminadas y restantes.
+  Si SIN_APROBADO no llegó a generarlo (CSV no encontrado o error), el correo sale sin adjunto.
 - Cada tarea tiene su propio `try/catch` en el template: si una falla por error técnico, aparece como `ERROR_PROCESO` en el correo y el build queda amarillo, sin perder el resto.
 
 ## 6. Decisiones tomadas y supuestos
