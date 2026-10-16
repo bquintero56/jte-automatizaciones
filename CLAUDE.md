@@ -128,7 +128,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
    tarea se detiene (el pipeline no falla). Si existe y todo está bien, no se envía nada por esta tarea.
    Si hay **varios** CSV, usa el **más reciente** por fecha de modificación (`ls -1t`); el log muestra todos.
 2. Copia el CSV al workspace (`sudo cat`) y **elimina las filas** cuya columna `TIPO_LIQUIDADOR` valga `Liquidador externo`
-   (sin distinguir mayúsculas, ignorando espacios y comillas). Genera `<nombre original>_limpio.csv` (ej. `482913_SIN_APROBADO_2026-10-15_limpio.csv`), que se archiva como artefacto del build y **se adjunta al correo**.
+   (sin distinguir mayúsculas, ignorando espacios y comillas). Genera la copia limpia **con el mismo nombre del original** (ej. `482913_SIN_APROBADO_2026-10-15.csv`), que se archiva como artefacto del build y **se adjunta al correo**.
    **El original en el servidor no se modifica** (por ahora, solo prueba).
 3. Busca los PDF `*_SIN_APROBADO_*_<AAAAMMDD>.pdf` en la misma ruta y cuenta cuántos hay.
 4. De cada nombre toma el **número del medio** (lo que queda entre `_SIN_APROBADO_` y `_<fecha>.pdf`) y comprueba que exista en la columna

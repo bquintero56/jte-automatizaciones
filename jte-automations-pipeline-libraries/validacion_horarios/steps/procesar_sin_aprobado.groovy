@@ -127,8 +127,9 @@ END { printf "%d %d\\n", removed, kept > "sin_aprobado_stats.txt" }
 '''
     writeFile file: 'sin_aprobado_filtrar.awk', text: awk
 
-    // Copia limpia con el nombre del original + _limpio (ej. 482913_SIN_APROBADO_2026-10-15_limpio.csv); se adjunta al correo
-    def archivoLimpio = nombreCsv.replaceAll(/(?i)\.csv$/, '') + '_limpio.csv'
+    // Copia limpia con el mismo nombre del original (ej. 482913_SIN_APROBADO_2026-10-15.csv); se adjunta al correo.
+    // No choca con el original: en el workspace la copia sin filtrar es sin_aprobado_original.csv
+    def archivoLimpio = nombreCsv
 
     def rcAwk = sh(
         returnStatus: true,
