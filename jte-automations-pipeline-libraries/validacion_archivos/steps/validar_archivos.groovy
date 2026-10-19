@@ -50,7 +50,6 @@ done < buscar_listado.txt
         def rutaEsp = item.rutaEspecifica
         def okGeneral    = false
         def okEspecifica = false
-        def rutasFallo   = []      // rutas donde NO se encontró el archivo
 
         // Nombre corto: sin {fecha} ni .csv (y sin "_" sobrante al final)
         def nombreCorto = item.nombre.replace('{fecha}', '').replace('.csv', '')
@@ -66,14 +65,12 @@ done < buscar_listado.txt
         if (enGeneral == null) {
             echo "❌ [GENERAL] Ruta no accesible: ${config.rutaGeneral}"
             faltantes << "[GENERAL] ${config.rutaGeneral}/${nombre} (ruta no accesible)"
-            rutasFallo << "${config.rutaGeneral} (ruta no accesible)"
         } else if (enGeneral) {
             echo "✅ [GENERAL] ${config.rutaGeneral}/${enGeneral[0]}"
             okGeneral = true
         } else {
             echo "❌ [GENERAL] No encontrado: ${config.rutaGeneral}/${nombre}"
             faltantes << "[GENERAL] ${config.rutaGeneral}/${nombre}"
-            rutasFallo << config.rutaGeneral
         }
 
         // 2) Ruta específica (patrón con comodín)
@@ -82,22 +79,23 @@ done < buscar_listado.txt
         if (enEspecifica == null) {
             echo "❌ [ESPECÍFICA] Ruta no accesible: ${rutaEsp}"
             faltantes << "[ESPECÍFICA] ${rutaEsp}/${patron} (ruta no accesible)"
-            rutasFallo << "${rutaEsp} (ruta no accesible)"
         } else if (enEspecifica) {
             echo "✅ [ESPECÍFICA] ${rutaEsp}/${enEspecifica.join(', ')}"
             okEspecifica = true
         } else {
             echo "❌ [ESPECÍFICA] No encontrado: ${rutaEsp}/${patron}"
             faltantes << "[ESPECÍFICA] ${rutaEsp}/${patron}"
-            rutasFallo << rutaEsp
         }
 
-        // Resultado para el correo
+        // Resultado para el correo: las dos rutas, cada una con su estatus (primero la general, luego la específica)
         resultados << [
             proceso: item.proceso ?: nombreCorto,
             archivo: nombreCorto,
             estatus: (okGeneral && okEspecifica) ? 'OK' : 'ERROR',
-            rutas:   rutasFallo,
+            rutas:   [
+                [ruta: config.rutaGeneral, estatus: okGeneral    ? 'OK' : 'ERROR'],
+                [ruta: rutaEsp,            estatus: okEspecifica ? 'OK' : 'ERROR']
+            ],
             fecha:   fechaAyer
         ]
     }

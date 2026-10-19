@@ -106,9 +106,10 @@ Un archivo queda `OK` solo si está en **las dos** rutas; si falta en cualquiera
   `rutaGeneral`, `archivos` (lista de `[nombre, rutaEspecifica, patronEspecifico]`). `{fecha}` se reemplaza por la fecha de ayer.
 - **Ejecución:** diaria a la 1:00 p. m. (`America/Bogota`). El cron está en el template con `properties([pipelineTriggers([cron(...)])])`.
 - **Step `validar_archivos()`** devuelve una lista; por archivo: `[proceso, archivo, estatus, rutas, fecha]`.
-  `rutas` = rutas donde **no** se encontró (la general, la específica o ambas; con ` (ruta no accesible)` si no se pudo entrar).
-- **Correo (`enviar_correo_validacion_archivos`):** se envía **siempre**. Tabla `PROCESO | ESTATUS | RUTA DONDE NO SE ENCONTRÓ`
-  (`-` cuando está `OK`).
+  `rutas` = siempre las **dos** rutas, cada una con su estatus: `[[ruta: rutaGeneral, estatus], [ruta: rutaEspecifica, estatus]]`
+  (`OK` / `ERROR`; una ruta no accesible es `ERROR` y el motivo queda en el log). `estatus` = `OK` solo si las dos están `OK`.
+- **Correo (`enviar_correo_validacion_archivos`):** se envía **siempre**. Tabla `PROCESO | RUTA | ESTATUS` con **una fila por ruta**
+  (general y luego específica); la celda `PROCESO` ocupa las dos filas de su archivo (`rowspan`), así el nombre no se repite.
 
 ## 5. Pipeline 2 – `validar-archivos-horarios`
 
