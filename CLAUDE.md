@@ -88,6 +88,8 @@ jte-pipelines-template/
    `catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) { throw e }`, para que un aborto manual o el `timeout`
    detengan el job (estado ABORTED) en vez de tratarse como error.
 8. **Correo** con `emailext` (plugin Email Extension), `mimeType: 'text/html'`.
+   - Destinatarios en `notificacion_correo.destinatarios`; **copia (CC)** en `notificacion_correo.copia` (opcional, separados por coma, cada
+     pipeline tiene la suya). Los dos steps de correo arman `to` = destinatarios + cada copia con prefijo `cc:` (sintaxis de emailext).
    - Asunto: `<asuntoPrefijo> <NOMBRES SIN FECHA NI .csv, separados por coma> <asuntoSufijo> - <fecha>`
      (ej. `Monitoreo activo Seguimiento DEVOLUCION, CONTADOR 360 - 2026-10-09`).
    - Cuerpo: `Estimados buenos días,` → contenido → `Saludos.` (la "NOTA IMPORTANTE" que se mencionó al inicio **no** va en el correo).

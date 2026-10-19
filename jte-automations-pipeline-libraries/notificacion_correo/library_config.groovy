@@ -4,4 +4,7 @@ fields {
         asuntoPrefijo = String
         asuntoSufijo  = String
     }
+    optional {
+        copia         = String      // CC separados por coma; vacío o ausente = sin copia
+    }
 }

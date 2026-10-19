@@ -199,13 +199,19 @@ void call(List resultados, Map sa = [:], Map ec = [:]) {
     </body>
     </html>"""
 
+    // Copia (CC): emailext los toma del mismo campo "to" con el prefijo cc:
+    def copia = (config.copia ?: '').split(',').collect { it.trim() }.findAll { it }
+    def para  = ([config.destinatarios] + copia.collect { "cc:${it}" }).join(',')
+
     emailext(
-        to:                 config.destinatarios,
+        to:                 para,
         subject:            "${config.asuntoPrefijo} ${nombres} ${config.asuntoSufijo} - ${fecha}",
         mimeType:           'text/html',
         body:               html,
         attachmentsPattern: sa.archivoLimpio ?: ''     // ruta relativa al workspace; vacío = sin adjunto
     )
 
-    echo "Correo enviado a: ${config.destinatarios}" + (sa.archivoLimpio ? " | adjunto: ${sa.archivoLimpio}" : '')
+    echo "Correo enviado a: ${config.destinatarios}" +
+         (copia ? " | CC: ${copia.join(', ')}" : '') +
+         (sa.archivoLimpio ? " | adjunto: ${sa.archivoLimpio}" : '')
 }

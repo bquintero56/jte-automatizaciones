@@ -58,6 +58,7 @@ libraries {
 
     notificacion_correo {
         destinatarios = 'persona1@empresa.com,persona2@empresa.com'
+        copia         = 'copia1@empresa.com,copia2@empresa.com'   // CC (opcional; '' = sin copia)
         asuntoPrefijo = 'Monitoreo activo Seguimiento'
         asuntoSufijo  = '360'
     }

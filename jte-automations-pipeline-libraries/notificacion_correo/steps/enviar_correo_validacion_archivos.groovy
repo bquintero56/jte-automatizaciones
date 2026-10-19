@@ -42,12 +42,16 @@ void call(List resultados) {
     </body>
     </html>"""
 
+    // Copia (CC): emailext los toma del mismo campo "to" con el prefijo cc:
+    def copia = (config.copia ?: '').split(',').collect { it.trim() }.findAll { it }
+    def para  = ([config.destinatarios] + copia.collect { "cc:${it}" }).join(',')
+
     emailext(
-        to:       config.destinatarios,
+        to:       para,
         subject:  "${config.asuntoPrefijo} ${nombres} ${config.asuntoSufijo} - ${fecha}",
         mimeType: 'text/html',
         body:     html
     )
 
-    echo "Correo enviado a: ${config.destinatarios}"
+    echo "Correo enviado a: ${config.destinatarios}" + (copia ? " | CC: ${copia.join(', ')}" : '')
 }
