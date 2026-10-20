@@ -6,15 +6,13 @@ List call() {
     def resultados  = []
     def totalChecks = 0
 
-    // Fecha de los archivos: diasAtras = 0 → mismo día de la ejecución, 1 → día anterior
-    def fecha = sh(
+    // Fecha del día anterior
+    def fechaAyer = sh(
         returnStdout: true,
-        script: """#!/bin/sh
-TZ='${config.zonaHoraria}' date -d '${config.diasAtras} days ago' +'${config.formatoFecha}'
-"""
+        script: "TZ='${config.zonaHoraria}' date -d 'yesterday' +'${config.formatoFecha}'"
     ).trim()
 
-    echo "Fecha de los archivos: ${fecha} (diasAtras = ${config.diasAtras})"
+    echo "Fecha del día anterior: ${fechaAyer}"
 
     // Busca en una ruta los archivos que coinciden con el patrón.
     // Devuelve null si la ruta no es accesible, o la lista de coincidencias (vacía si no hay).
@@ -47,8 +45,8 @@ done < buscar_listado.txt
     }
 
     config.archivos.each { item ->
-        def nombre  = item.nombre.replace('{fecha}', fecha)
-        def patron  = item.patronEspecifico.replace('{fecha}', fecha)
+        def nombre  = item.nombre.replace('{fecha}', fechaAyer)
+        def patron  = item.patronEspecifico.replace('{fecha}', fechaAyer)
         def rutaEsp = item.rutaEspecifica
         def okGeneral    = false
         def okEspecifica = false
@@ -98,7 +96,7 @@ done < buscar_listado.txt
                 [ruta: config.rutaGeneral, estatus: okGeneral    ? 'OK' : 'ERROR'],
                 [ruta: rutaEsp,            estatus: okEspecifica ? 'OK' : 'ERROR']
             ],
-            fecha:   fecha
+            fecha:   fechaAyer
         ]
     }
 

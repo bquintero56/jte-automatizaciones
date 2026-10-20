@@ -23,7 +23,6 @@ libraries {
         runAsUser      = 'usr_datos'
         formatoFecha   = '%Y%m%d'
         zonaHoraria    = 'America/Bogota'
-        diasAtras      = 0                  // 0 = archivos del mismo día, 1 = del día anterior
         estadoSiFaltan = 'SUCCESS'          // SUCCESS, UNSTABLE o FAILURE
 
         rutaGeneral    = '/data/entrada'    // donde deben estar los 5 archivos
