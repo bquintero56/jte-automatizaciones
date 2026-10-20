@@ -95,11 +95,11 @@ done < buscar_listado.txt
         echo "   Se usa el más reciente: ${nombreCsv}"
     }
 
-    // ---------- 2) Copia local del CSV ----------
+    // ---------- 2) Copia local del CSV (con su nombre original: se adjunta al correo, no se archiva en Jenkins) ----------
     def rcCopia = sh(
         returnStatus: true,
         script: """#!/bin/sh
-ssh -o StrictHostKeyChecking=no ${user}@${host} "sudo -n -u ${runAsUser} cat '${rutaCsv}/${nombreCsv}'" > enviocc_original.csv
+ssh -o StrictHostKeyChecking=no ${user}@${host} "sudo -n -u ${runAsUser} cat '${rutaCsv}/${nombreCsv}'" > '${nombreCsv}'
 """
     )
     if (rcCopia != 0) {
@@ -110,6 +110,9 @@ ssh -o StrictHostKeyChecking=no ${user}@${host} "sudo -n -u ${runAsUser} cat '${
             mensaje: "No se pudo leer el CSV ${rutaCsv}/${nombreCsv} (rc=${rcCopia})"
         ]
     }
+
+    // Desde aquí todos los resultados llevan el CSV para adjuntarlo
+    base = base + [adjunto: nombreCsv]
 
     // ---------- 3) Extraer la columna ----------
     def awk = '''
@@ -138,7 +141,7 @@ NR == 1 {
     def rcAwk = sh(
         returnStatus: true,
         script: """#!/bin/sh
-awk -v sep='${c.separador}' -v col='${c.columna}' -f enviocc_extraer.awk enviocc_original.csv > enviocc_nombres.txt
+awk -v sep='${c.separador}' -v col='${c.columna}' -f enviocc_extraer.awk '${nombreCsv}' > enviocc_nombres.txt
 """
     )
     if (rcAwk != 0) {

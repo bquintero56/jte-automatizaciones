@@ -25,12 +25,13 @@ date -d '${config.diasAtras} days ago' +'${config.formatoMes}'
     // Busca en una ruta los archivos que coinciden con el patrón.
     // Devuelve null si la ruta no es accesible, o la lista de coincidencias (vacía si no hay).
     def buscar = { String ruta, String patron ->
-        // Una sola conexión: lista la carpeta en un archivo local; el rc indica si la ruta es accesible
+        // Una sola conexión: lista la carpeta en un archivo local; el rc indica si la ruta es accesible.
+        // ls -1t ordena del más reciente al más antiguo (fecha de modificación): la primera coincidencia es la última creada.
         def rc = sh(
             returnStatus: true,
             script: """#!/bin/sh
 ssh -o StrictHostKeyChecking=no ${user}@${host} \\
-    "sudo -n -u ${runAsUser} test -d '${ruta}' && sudo -n -u ${runAsUser} ls -1 '${ruta}'" > buscar_listado.txt
+    "sudo -n -u ${runAsUser} test -d '${ruta}' && sudo -n -u ${runAsUser} ls -1t '${ruta}'" > buscar_listado.txt
 """
         )
         if (rc != 0) {
@@ -66,14 +67,32 @@ done < buscar_listado.txt
         }
 
         def encontrados = buscar(ruta, nombre)
-        def ok = false
+        def ok      = false
+        def adjunto = null
 
         if (encontrados == null) {
             echo "❌ [COM_ID ${item.COM_ID ?: '-'}] Ruta no accesible: ${ruta}"
             faltantes << "[COM_ID ${item.COM_ID ?: '-'}] ${ruta}/${nombre} (ruta no accesible)"
         } else if (encontrados) {
-            echo "✅ [COM_ID ${item.COM_ID ?: '-'}] ${ruta}/${encontrados[0]}"
+            def archivo = encontrados[0]
+            echo "✅ [COM_ID ${item.COM_ID ?: '-'}] ${ruta}/${archivo}"
+            if (encontrados.size() > 1) {
+                echo "   ⚠️ Hay ${encontrados.size()} que coinciden, se usa el más reciente: ${encontrados.join(', ')}"
+            }
             ok = true
+
+            // Copia al workspace con su nombre original para adjuntarla al correo (no se archiva en Jenkins)
+            def rcCopia = sh(
+                returnStatus: true,
+                script: """#!/bin/sh
+ssh -o StrictHostKeyChecking=no ${user}@${host} "sudo -n -u ${runAsUser} cat '${ruta}/${archivo}'" > '${archivo}'
+"""
+            )
+            if (rcCopia == 0) {
+                adjunto = archivo
+            } else {
+                echo "   ⚠️ No se pudo copiar ${archivo} (rc=${rcCopia}): no se adjunta al correo"
+            }
         } else {
             echo "❌ [COM_ID ${item.COM_ID ?: '-'}] No encontrado: ${ruta}/${nombre}"
             faltantes << "[COM_ID ${item.COM_ID ?: '-'}] ${ruta}/${nombre}"
@@ -85,6 +104,7 @@ done < buscar_listado.txt
             proceso:     item.proceso ?: nombreCorto,
             archivo:     nombreCorto,
             estatus:     ok ? 'OK' : 'ERROR',
+            adjunto:     adjunto,       // archivo copiado al workspace (null si no se encontró o no se pudo copiar)
             fecha:       fecha
         ]
     }

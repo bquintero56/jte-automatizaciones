@@ -148,8 +148,8 @@ awk -v sep='${c.separador}' -v colTipo='${c.columnaTipo}' -v colSin='${c.columna
     def siniestrosCsv = readFile('sin_aprobado_siniestros.txt').readLines().collect { it.trim() }.findAll { it }
 
     echo "Filas con '${c.valorExcluir}' eliminadas: ${eliminadas} | filas restantes: ${conservadas}"
+    // Solo se adjunta al correo; no se archiva en Jenkins (el workspace se limpia al final)
     echo "📎 Archivo limpio generado: ${archivoLimpio} (se adjunta al correo)"
-    archiveArtifacts artifacts: archivoLimpio, allowEmptyArchive: true
 
     // ---------- 4) PDFs ----------
     echo "Buscando PDFs: ${ruta}/${patronPdf}"

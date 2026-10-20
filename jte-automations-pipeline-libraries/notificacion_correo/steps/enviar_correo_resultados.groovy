@@ -179,12 +179,28 @@ void call(List resultados, Map sa = [:], Map ec = [:]) {
         ${detalleEC}"""
     }
 
-    // ---------- Adjunto: CSV de SIN_APROBADO sin las filas excluidas ----------
-    def adjunto = ''
+    // ---------- Adjuntos: CSV encontrados (validaciones, SIN_APROBADO limpio y ENVIOCC) ----------
+    // Están en el workspace con su nombre original; solo viajan en el correo, no se archivan en Jenkins
+    def adjuntos = []
+    resultados.each { r ->
+        if (r.adjunto) {
+            adjuntos << [nombre: r.adjunto, nota: '']
+        }
+    }
     if (sa.archivoLimpio) {
+        adjuntos << [nombre: sa.archivoLimpio,
+                     nota:   " (sin las filas con \"${sa.valorExcluir}\": ${sa.eliminadas} eliminadas, ${sa.conservadas} restantes)"]
+    }
+    if (ec.adjunto) {
+        adjuntos << [nombre: ec.adjunto, nota: '']
+    }
+
+    def adjunto = ''
+    if (adjuntos) {
+        def items = adjuntos.collect { a -> "<li><b>${a.nombre}</b>${a.nota}</li>" }.join('')
         adjunto = """
-        <p style="margin-top:20px;">Se adjunta el archivo <b>${sa.archivoLimpio}</b>: ${sa.titulo ?: 'SIN_APROBADO'} sin las filas con
-        "${sa.valorExcluir}" (${sa.eliminadas} eliminadas, ${sa.conservadas} restantes).</p>"""
+        <p style="margin-top:20px;">Se adjuntan los archivos encontrados (${adjuntos.size()}):</p>
+        <ul>${items}</ul>"""
     }
 
     def html = """
@@ -208,10 +224,10 @@ void call(List resultados, Map sa = [:], Map ec = [:]) {
         subject:            "${config.asuntoPrefijo} ${nombres} ${config.asuntoSufijo} - ${fecha}",
         mimeType:           'text/html',
         body:               html,
-        attachmentsPattern: sa.archivoLimpio ?: ''     // ruta relativa al workspace; vacío = sin adjunto
+        attachmentsPattern: adjuntos.collect { it.nombre }.join(',')    // rutas relativas al workspace; vacío = sin adjuntos
     )
 
     echo "Correo enviado a: ${config.destinatarios}" +
          (copia ? " | CC: ${copia.join(', ')}" : '') +
-         (sa.archivoLimpio ? " | adjunto: ${sa.archivoLimpio}" : '')
+         (adjuntos ? " | adjuntos (${adjuntos.size()}): ${adjuntos.collect { it.nombre }.join(', ')}" : '')
 }

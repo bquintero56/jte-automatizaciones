@@ -123,7 +123,9 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 - Nombre buscado: `prefijoNombre + nombre` con `{fecha}` reemplazada (ej. `*_DEVOLUCION_2026-10-09.csv`). Todos los archivos llevan
   números aleatorios al inicio, por eso `prefijoNombre = '*_'`.
 - Cada archivo de la config lleva: `COM_ID` (ID numérico), `DES` (descripción) y `nombre`. Opcional: `ruta` para sobrescribir `rutaBase`.
-- Resultado por archivo: `[comId, descripcion, proceso, archivo, estatus, fecha]`.
+- Si hay varios que coinciden, usa el **más reciente** (`ls -1t`). El encontrado se copia al workspace con su nombre original (`sudo cat`)
+  para **adjuntarlo al correo**.
+- Resultado por archivo: `[comId, descripcion, proceso, archivo, estatus, adjunto, fecha]` (`adjunto` = nombre del archivo copiado, o `null`).
 
 ### 5.2 `SIN_APROBADO` (`procesar_sin_aprobado`)
 
@@ -131,7 +133,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
    tarea se detiene (el pipeline no falla). Si existe y todo está bien, no se envía nada por esta tarea.
    Si hay **varios** CSV, usa el **más reciente** por fecha de modificación (`ls -1t`); el log muestra todos.
 2. Copia el CSV al workspace (`sudo cat`) y **elimina las filas** cuya columna `TIPO_LIQUIDADOR` valga `Liquidador externo`
-   (sin distinguir mayúsculas, ignorando espacios y comillas). Genera la copia limpia **con el mismo nombre del original** (ej. `482913_SIN_APROBADO_2026-10-15.csv`), que se archiva como artefacto del build y **se adjunta al correo**.
+   (sin distinguir mayúsculas, ignorando espacios y comillas). Genera la copia limpia **con el mismo nombre del original** (ej. `482913_SIN_APROBADO_2026-10-15.csv`), que **se adjunta al correo** (no se archiva en Jenkins).
    **El original en el servidor no se modifica** (por ahora, solo prueba).
 3. Busca los PDF `*_SIN_APROBADO_*_<AAAAMMDD>.pdf` en la misma ruta y cuenta cuántos hay.
 4. De cada nombre toma el **número del medio** (lo que queda entre `_SIN_APROBADO_` y `_<fecha>.pdf`) y comprueba que exista en la columna
@@ -143,7 +145,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 
 1. Busca el CSV `*_ENVIOCC_<AAAA-MM-DD>.csv` en `rutaBase/{mes}`. Si no existe → `CSV_NO_ENCONTRADO` (correo, sin fallar).
    Si hay **varios**, usa el **más reciente** por fecha de modificación (`buscar()` de este step lista con `ls -1t`); el log muestra todos.
-2. Copia el CSV y extrae todos los valores de la columna `FILENAMEFIELD`.
+2. Copia el CSV al workspace **con su nombre original** (se adjunta al correo, `ec.adjunto`) y extrae todos los valores de la columna `FILENAMEFIELD`.
 3. Busca en `rutaPdf` (`/Sistema/Proyecto/test/PDF`) los PDF `*_CCTEST_*_<dd_MM_yyyy>.pdf` (fecha **día_mes_año** al final; números iniciales y del medio aleatorios).
 4. **Normaliza** ambos lados quitando los números iniciales y la extensión: `2131231232_CCTEST_123213123213_09_10_2026.pdf` → `CCTEST_123213123213_09_10_2026`.
 5. Compara los dos conjuntos:
@@ -170,9 +172,10 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 2. **Sección `Validación SIN_APROBADO`**: solo si hay algo que reportar (CSV no encontrado, PDF sin registro o error).
 3. **Sección `Detalle ENVIOCC`**: solo si ENVIOCC terminó en error.
 - Se envía en cada ejecución (siempre hay validaciones que reportar).
-- **Adjunto:** si SIN_APROBADO generó el CSV limpio (`sa.archivoLimpio`), `emailext` lo adjunta con `attachmentsPattern` (ruta relativa al
-  workspace, por eso el correo se envía antes del `clean_job_workspace()` del `finally`) y el cuerpo lo menciona con las filas eliminadas y restantes.
-  Si SIN_APROBADO no llegó a generarlo (CSV no encontrado o error), el correo sale sin adjunto.
+- **Adjuntos:** todos los **CSV encontrados** con su nombre original: los de las validaciones (`r.adjunto`), el de SIN_APROBADO ya limpio
+  (`sa.archivoLimpio`) y el de ENVIOCC (`ec.adjunto`). **Ningún PDF.** `emailext` los adjunta con `attachmentsPattern` (lista separada por
+  comas, rutas relativas al workspace; por eso el correo se envía antes del `clean_job_workspace()` del `finally`) y el cuerpo los lista
+  ("Se adjuntan los archivos encontrados (N)"). Lo que no se encontró no se adjunta. **Nada se archiva en Jenkins** (sin `archiveArtifacts`).
 - Cada tarea tiene su propio `try/catch` en el template: si una falla por error técnico, aparece como `ERROR_PROCESO` en el correo y el build queda amarillo, sin perder el resto.
 
 ## 6. Decisiones tomadas y supuestos
