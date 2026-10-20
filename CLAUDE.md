@@ -97,15 +97,15 @@ jte-pipelines-template/
 
 ## 4. Pipeline 1 – `validar-archivos`
 
-**Objetivo:** cada día verificar 5 archivos (nombre con la fecha del **día anterior**) en dos sitios:
+**Objetivo:** cada día verificar 5 archivos (nombre con la fecha del **mismo día** de la ejecución) en dos sitios:
 1. **Ruta general** (`rutaGeneral`, ej. `/data/entrada`): nombre exacto, `REPORTE_{fecha}.csv`.
 2. **Ruta específica** de cada archivo (`rutaEspecifica`): nombre con comodín (`patronEspecifico`, ej. `REPORTE_{fecha}_*.csv`), porque
    en esa ruta el nombre lleva números aleatorios.
 
 Un archivo queda `OK` solo si está en **las dos** rutas; si falta en cualquiera, `ERROR`.
 
-- **Config (`validacion_archivos`):** `host`, `user`, `runAsUser`, `formatoFecha` (`%Y%m%d`), `zonaHoraria`, `estadoSiFaltan`,
-  `rutaGeneral`, `archivos` (lista de `[nombre, rutaEspecifica, patronEspecifico]`). `{fecha}` se reemplaza por la fecha de ayer.
+- **Config (`validacion_archivos`):** `host`, `user`, `runAsUser`, `formatoFecha` (`%Y%m%d`), `zonaHoraria`, `diasAtras`, `estadoSiFaltan`,
+  `rutaGeneral`, `archivos` (lista de `[nombre, rutaEspecifica, patronEspecifico]`). `{fecha}` se reemplaza por la fecha de hace `diasAtras` días (`0` = mismo día, producción; `1` = día anterior, para pruebas).
 - **Ejecución:** diaria a la 1:00 p. m. (`America/Bogota`). El cron está en el template con `properties([pipelineTriggers([cron(...)])])`.
 - **Step `validar_archivos()`** devuelve una lista; por archivo: `[proceso, archivo, estatus, rutas, fecha]`.
   `rutas` = siempre las **dos** rutas, cada una con su estatus: `[[ruta: rutaGeneral, estatus], [ruta: rutaEspecifica, estatus]]`
@@ -197,7 +197,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 6. **`SIN_APROBADO` con 0 PDF** solo se ve en el log; no genera aviso. Y no aparece en la tabla de estatus (ENVIOCC sí); se puede agregar con su propio `COM_ID`.
 7. ~~Varios CSV que coincidan~~ → resuelto: SIN_APROBADO y ENVIOCC usan el más reciente por fecha de modificación (`ls -1t`); el log muestra todos.
 8. **Nombres en las rutas específicas del pipeline 1:** en algún momento se mencionó `REPORTE{fecha}.csv_*` (números después del `.csv`); la config actual usa `REPORTE_{fecha}_*.csv`. Confirmar el nombre real.
-9. **Pipeline 1 busca la fecha de "ayer":** el lunes busca el domingo. Si no se generan archivos en fin de semana, usar el último día hábil.
+9. ~~Pipeline 1 busca la fecha de "ayer"~~ → cambiado: busca los archivos del **mismo día** (`diasAtras = 0`). Hasta el commit `6d0f006` usaba el día anterior.
 10. **Duplicación:** `buscar()` y el armado de fechas están repetidos en varios steps. Candidato a refactor (librería o step común) y a unificar los dos steps de correo.
 11. **`properties([...])` en el template** reemplaza los triggers/parámetros definidos en la interfaz del job, y se registra la primera vez que el job corre: tras cambiar la hora hay que lanzarlo una vez a mano.
 12. ~~Ventana de tolerancia~~ → ya no aplica: con una sola hora, cada ejecución valida todo aunque Jenkins arranque tarde.

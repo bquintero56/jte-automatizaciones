@@ -5,6 +5,7 @@ fields {
         runAsUser      = String
         formatoFecha   = String
         zonaHoraria    = String
+        diasAtras      = Integer
         estadoSiFaltan = String
         rutaGeneral    = String
         archivos       = List
