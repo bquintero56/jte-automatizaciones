@@ -1,8 +1,16 @@
-void call(List resultados) {
-    def fecha   = resultados ? resultados[0].fecha : ''
-    def nombres = resultados.collect { it.archivo }.join(', ')
+// validacion: resultado de validar_archivos() → [fecha, horario, descripcion, resultados]
+void call(Map validacion) {
+    def resultados = validacion.resultados ?: []
+    def fecha      = validacion.fecha ?: ''
+    def nombres    = resultados.collect { it.archivo }.join(', ')
 
-    def estilo = 'border:1px solid #999;padding:8px 12px;'
+    // Horario de esta ejecución (ej. "11:15 - rutas específicas"); TODOS solo en pruebas manuales
+    def horarioTexto = validacion.horario
+        ? "${validacion.horario}${validacion.descripcion ? ' - ' + validacion.descripcion : ''}"
+        : ''
+
+    def estilo  = 'border:1px solid #999;padding:8px 12px;'
+    def colores = [OK: '#2e7d32', ERROR: '#c62828', PAUSADO: '#e65100']
 
     // Una fila por ruta; la celda PROCESO ocupa todas las filas de su proceso (rowspan)
     def filas = resultados.collect { r ->
@@ -10,7 +18,7 @@ void call(List resultados) {
         def filasProceso = []
         for (int i = 0; i < n; i++) {
             def x       = r.rutas[i]
-            def color   = (x.estatus == 'OK') ? '#2e7d32' : '#c62828'
+            def color   = colores[x.estatus] ?: '#c62828'
             def proceso = (i == 0) ? """<td rowspan="${n}" style="${estilo}vertical-align:middle;">${r.proceso}</td>""" : ''
             filasProceso << """
         <tr>
@@ -27,7 +35,7 @@ void call(List resultados) {
     <body style="font-family:Arial,sans-serif;font-size:14px;color:#222;">
         <p>Estimados buenos días,</p>
 
-        <p>Se adjunta el status de los archivos de ${nombres}</p>
+        <p>Se adjunta el status de los archivos de ${nombres}${horarioTexto ? " (validación de las ${horarioTexto})" : ''}</p>
 
         <table style="border-collapse:collapse;min-width:500px;">
             <tr style="background:#eeeeee;">
@@ -48,7 +56,7 @@ void call(List resultados) {
 
     emailext(
         to:       para,
-        subject:  "${config.asuntoPrefijo} ${nombres} ${config.asuntoSufijo} - ${fecha}",
+        subject:  "${config.asuntoPrefijo} ${nombres} ${config.asuntoSufijo} - ${fecha}${validacion.horario ? ' ' + validacion.horario : ''}",
         mimeType: 'text/html',
         body:     html
     )

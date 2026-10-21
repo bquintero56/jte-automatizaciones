@@ -1,18 +1,75 @@
-List call() {
+// Valida lo que toca en este horario:
+//  - horaRutaGeneral → la ruta general de TODOS los archivos (sin pausa)
+//  - horaEspecifica  → la ruta específica de los archivos de ese horario (estado PAUSADO = no se busca, sale PAUSADO)
+// modo: vacío = según la hora actual (cron); TODOS = todo (pruebas); HH:mm = simula ese horario (pruebas).
+// Devuelve [fecha, horario, descripcion, resultados]; resultados por archivo: [proceso, archivo, estatus, rutas, fecha].
+Map call(String modo = '') {
     def host        = config.host
     def user        = config.user
     def runAsUser   = config.runAsUser
     def faltantes   = []
     def resultados  = []
     def totalChecks = 0
+    def pausados    = 0
 
-    // Fecha del día anterior
-    def fechaAyer = sh(
+    // Fecha de los archivos (día de ejecución con diasAtras = 0) y hora actual, en la zona horaria de la config
+    def datos = sh(
         returnStdout: true,
-        script: "TZ='${config.zonaHoraria}' date -d 'yesterday' +'${config.formatoFecha}'"
-    ).trim()
+        script: """#!/bin/sh
+export TZ='${config.zonaHoraria}'
+date -d '${config.diasAtras} days ago' +'${config.formatoFecha}'
+date +'%H:%M'
+"""
+    ).trim().readLines()
 
-    echo "Fecha del día anterior: ${fechaAyer}"
+    def fecha      = datos[0]
+    def horaActual = datos[1]
+
+    // ---------- ¿Qué horario es esta ejecución? ----------
+    def m          = modo?.trim()
+    def todos      = (m?.toUpperCase() == 'TODOS')
+    def referencia = (m && !todos) ? m : horaActual
+
+    def aMinutos = { h ->
+        def p = String.valueOf(h).trim().split(':')
+        return p[0].toInteger() * 60 + p[1].toInteger()
+    }
+
+    // El horario es la hora programada más reciente dentro de la ventana (por si Jenkins arranca tarde)
+    def horas = [config.horaRutaGeneral]
+    config.archivos.each { item -> horas << item.horaEspecifica }
+    horas = horas.collect { String.valueOf(it).trim() }.unique()
+
+    def franja = null
+    if (!todos) {
+        def ref        = aMinutos(referencia)
+        def candidatas = horas.findAll { h ->
+            def diff = ref - aMinutos(h)
+            return (diff >= 0 && diff < config.ventanaMinutos)
+        }
+        if (candidatas) {
+            def max = candidatas.collect { aMinutos(it) }.max()
+            franja  = candidatas.find { aMinutos(it) == max }
+        }
+    }
+
+    def validarGeneral = todos || (franja != null && aMinutos(config.horaRutaGeneral) == aMinutos(franja))
+    def esEspecifico   = { item -> todos || (franja != null && aMinutos(item.horaEspecifica) == aMinutos(franja)) }
+    def especificos    = config.archivos.findAll { esEspecifico(it) }
+
+    def partes = []
+    if (validarGeneral) { partes << 'ruta general' }
+    if (especificos)    { partes << 'rutas específicas' }
+    def horario     = todos ? 'TODOS' : franja
+    def descripcion = partes.join(' y ')
+
+    echo "Fecha: ${fecha} | Hora: ${horaActual} | Referencia: ${todos ? 'TODOS' : referencia} | Horario: ${horario ?: 'ninguno'}" +
+         (descripcion ? " → ${descripcion}" : '')
+
+    if (!validarGeneral && !especificos) {
+        echo "No hay validaciones programadas para las ${referencia} (horarios: ${horas.join(', ')}; ventana de ${config.ventanaMinutos} min)"
+        return [fecha: fecha, horario: null, descripcion: '', resultados: []]
+    }
 
     // Busca en una ruta los archivos que coinciden con el patrón.
     // Devuelve null si la ruta no es accesible, o la lista de coincidencias (vacía si no hay).
@@ -45,11 +102,15 @@ done < buscar_listado.txt
     }
 
     config.archivos.each { item ->
-        def nombre  = item.nombre.replace('{fecha}', fechaAyer)
-        def patron  = item.patronEspecifico.replace('{fecha}', fechaAyer)
+        def especifico = esEspecifico(item)
+        if (!validarGeneral && !especifico) {
+            return      // este archivo no tiene nada que validar en este horario
+        }
+
+        def nombre  = item.nombre.replace('{fecha}', fecha)
+        def patron  = item.patronEspecifico.replace('{fecha}', fecha)
         def rutaEsp = item.rutaEspecifica
-        def okGeneral    = false
-        def okEspecifica = false
+        def rutas   = []
 
         // Nombre corto: sin {fecha} ni .csv (y sin "_" sobrante al final)
         def nombreCorto = item.nombre.replace('{fecha}', '').replace('.csv', '')
@@ -59,51 +120,68 @@ done < buscar_listado.txt
 
         echo "------ ${nombre} ------"
 
-        // 1) Ruta general (nombre exacto)
-        totalChecks++
-        def enGeneral = buscar(config.rutaGeneral, nombre)
-        if (enGeneral == null) {
-            echo "❌ [GENERAL] Ruta no accesible: ${config.rutaGeneral}"
-            faltantes << "[GENERAL] ${config.rutaGeneral}/${nombre} (ruta no accesible)"
-        } else if (enGeneral) {
-            echo "✅ [GENERAL] ${config.rutaGeneral}/${enGeneral[0]}"
-            okGeneral = true
-        } else {
-            echo "❌ [GENERAL] No encontrado: ${config.rutaGeneral}/${nombre}"
-            faltantes << "[GENERAL] ${config.rutaGeneral}/${nombre}"
+        // 1) Ruta general (nombre exacto): siempre se valida en su horario, sin pausa
+        if (validarGeneral) {
+            totalChecks++
+            def okGeneral = false
+            def enGeneral = buscar(config.rutaGeneral, nombre)
+            if (enGeneral == null) {
+                echo "❌ [GENERAL] Ruta no accesible: ${config.rutaGeneral}"
+                faltantes << "[GENERAL] ${config.rutaGeneral}/${nombre} (ruta no accesible)"
+            } else if (enGeneral) {
+                echo "✅ [GENERAL] ${config.rutaGeneral}/${enGeneral[0]}"
+                okGeneral = true
+            } else {
+                echo "❌ [GENERAL] No encontrado: ${config.rutaGeneral}/${nombre}"
+                faltantes << "[GENERAL] ${config.rutaGeneral}/${nombre}"
+            }
+            rutas << [ruta: config.rutaGeneral, estatus: okGeneral ? 'OK' : 'ERROR']
         }
 
-        // 2) Ruta específica (patrón con comodín)
-        totalChecks++
-        def enEspecifica = buscar(rutaEsp, patron)
-        if (enEspecifica == null) {
-            echo "❌ [ESPECÍFICA] Ruta no accesible: ${rutaEsp}"
-            faltantes << "[ESPECÍFICA] ${rutaEsp}/${patron} (ruta no accesible)"
-        } else if (enEspecifica) {
-            echo "✅ [ESPECÍFICA] ${rutaEsp}/${enEspecifica.join(', ')}"
-            okEspecifica = true
-        } else {
-            echo "❌ [ESPECÍFICA] No encontrado: ${rutaEsp}/${patron}"
-            faltantes << "[ESPECÍFICA] ${rutaEsp}/${patron}"
+        // 2) Ruta específica (patrón con comodín) en su horario; PAUSADO = no se busca
+        if (especifico) {
+            def estado = String.valueOf(item.estado ?: 'ACTIVO').trim().toUpperCase()
+            if (estado == 'PAUSADO') {
+                pausados++
+                echo "⏸️ [ESPECÍFICA] Monitoreo pausado, no se busca: ${rutaEsp}"
+                rutas << [ruta: rutaEsp, estatus: 'PAUSADO']
+            } else {
+                totalChecks++
+                def okEspecifica = false
+                def enEspecifica = buscar(rutaEsp, patron)
+                if (enEspecifica == null) {
+                    echo "❌ [ESPECÍFICA] Ruta no accesible: ${rutaEsp}"
+                    faltantes << "[ESPECÍFICA] ${rutaEsp}/${patron} (ruta no accesible)"
+                } else if (enEspecifica) {
+                    echo "✅ [ESPECÍFICA] ${rutaEsp}/${enEspecifica.join(', ')}"
+                    okEspecifica = true
+                } else {
+                    echo "❌ [ESPECÍFICA] No encontrado: ${rutaEsp}/${patron}"
+                    faltantes << "[ESPECÍFICA] ${rutaEsp}/${patron}"
+                }
+                rutas << [ruta: rutaEsp, estatus: okEspecifica ? 'OK' : 'ERROR']
+            }
         }
 
-        // Resultado para el correo: las dos rutas, cada una con su estatus (primero la general, luego la específica)
+        // Estatus del archivo: ERROR si alguna ruta falló; PAUSADO si todo lo validado está pausado; si no, OK
+        def conError  = rutas.findAll { it.estatus == 'ERROR' }.size()
+        def enPausa   = rutas.findAll { it.estatus == 'PAUSADO' }.size()
         resultados << [
             proceso: item.proceso ?: nombreCorto,
             archivo: nombreCorto,
-            estatus: (okGeneral && okEspecifica) ? 'OK' : 'ERROR',
-            rutas:   [
-                [ruta: config.rutaGeneral, estatus: okGeneral    ? 'OK' : 'ERROR'],
-                [ruta: rutaEsp,            estatus: okEspecifica ? 'OK' : 'ERROR']
-            ],
-            fecha:   fechaAyer
+            estatus: conError ? 'ERROR' : (enPausa == rutas.size() ? 'PAUSADO' : 'OK'),
+            rutas:   rutas,
+            fecha:   fecha
         ]
     }
 
     // Resumen
-    echo "=========== RESUMEN ==========="
+    echo "=========== RESUMEN (${horario}: ${descripcion}) ==========="
     echo "Validaciones OK: ${totalChecks - faltantes.size()} de ${totalChecks}"
     echo "Faltantes:       ${faltantes.size()} de ${totalChecks}"
+    if (pausados) {
+        echo "Pausados:        ${pausados} (no se buscaron)"
+    }
 
     if (faltantes) {
         echo "No encontrados:\n - ${faltantes.join('\n - ')}"
@@ -124,5 +202,5 @@ done < buscar_listado.txt
         echo "Todas las validaciones fueron exitosas"
     }
 
-    return resultados
+    return [fecha: fecha, horario: horario, descripcion: descripcion, resultados: resultados]
 }

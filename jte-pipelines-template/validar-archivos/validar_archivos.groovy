@@ -1,9 +1,7 @@
-def resultados = []
+def validacion = [:]
 
-// Ejecución diaria a la 1:00 p. m. (hora de Colombia)
-properties([
-    pipelineTriggers([cron('TZ=America/Bogota\n0 13 * * *')])
-])
+// Cron con los horarios de la config (horaRutaGeneral + horaEspecifica, en zonaHoraria) y parámetro HORARIO para pruebas
+programar_validaciones()
 
 timeout(time: execution.time, unit: execution.units) {
 
@@ -11,11 +9,16 @@ timeout(time: execution.time, unit: execution.units) {
         withFolderProperties {
             try {
                 stage('SSH: validar archivos') {
-                    resultados = validar_archivos()
+                    validacion = validar_archivos(params.HORARIO)
                 }
 
                 stage('Notificación: enviar correo') {
-                    enviar_correo_validacion_archivos(resultados)
+                    // Un correo por ejecución, con lo validado en ese horario
+                    if (validacion.resultados) {
+                        enviar_correo_validacion_archivos(validacion)
+                    } else {
+                        echo "Nada programado en este horario, no se envía correo"
+                    }
                 }
             }
             catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {

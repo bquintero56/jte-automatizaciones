@@ -22,36 +22,53 @@ libraries {
         user           = 'svc_jenkins'
         runAsUser      = 'usr_datos'
         formatoFecha   = '%Y%m%d'
-        zonaHoraria    = 'America/Bogota'
-        estadoSiFaltan = 'SUCCESS'          // SUCCESS, UNSTABLE o FAILURE
+        zonaHoraria    = 'America/Santiago'   // horas del cron y fecha de los archivos en hora de Chile
+        diasAtras      = 0                    // 0 = archivos del día de ejecución (producción), 1 = día anterior (pruebas)
+        estadoSiFaltan = 'SUCCESS'            // SUCCESS, UNSTABLE o FAILURE (PAUSADO no cuenta como faltante)
 
-        rutaGeneral    = '/data/entrada'    // donde deben estar los 5 archivos
+        // Horarios (HH:mm en zonaHoraria). Cada ejecución envía su propio correo con lo que validó.
+        horaRutaGeneral = '10:15'             // ruta general: siempre los 5 archivos (sin pausa)
+        ventanaMinutos  = 30                  // tolerancia si Jenkins arranca tarde: 11:20 sigue contando como 11:15
 
+        rutaGeneral    = '/data/entrada'      // donde deben estar los 5 archivos
+
+        // Por archivo: horaEspecifica = cuándo se valida su ruta específica; estado = 'ACTIVO' o 'PAUSADO'
+        // (PAUSADO: no se busca en la ruta específica y en el correo sale PAUSADO; la ruta general sí se valida)
         archivos = [
             [
                 nombre:           'REPORTE_{fecha}.csv',                // en la ruta general (exacto)
                 rutaEspecifica:   '/PROYECTO/Report/HOLA/Procesando',
-                patronEspecifico: 'REPORTE_{fecha}_*.csv'               // en su ruta (con comodín)
+                patronEspecifico: 'REPORTE_{fecha}_*.csv',              // en su ruta (con comodín)
+                horaEspecifica:   '11:15',
+                estado:           'ACTIVO'
             ],
             [
                 nombre:           'ARCHIVO_DOS_{fecha}.csv',
                 rutaEspecifica:   '/PROYECTO/Report/RUTA2',
-                patronEspecifico: 'ARCHIVO_DOS_{fecha}_*.csv'
+                patronEspecifico: 'ARCHIVO_DOS_{fecha}_*.csv',
+                horaEspecifica:   '11:15',
+                estado:           'ACTIVO'
             ],
             [
                 nombre:           'ARCHIVO_TRES_{fecha}.csv',
                 rutaEspecifica:   '/PROYECTO/Report/RUTA3',
-                patronEspecifico: 'ARCHIVO_TRES_{fecha}_*.csv'
+                patronEspecifico: 'ARCHIVO_TRES_{fecha}_*.csv',
+                horaEspecifica:   '18:45',
+                estado:           'ACTIVO'
             ],
             [
                 nombre:           'ARCHIVO_CUATRO_{fecha}.csv',
                 rutaEspecifica:   '/PROYECTO/Report/RUTA4',
-                patronEspecifico: 'ARCHIVO_CUATRO_{fecha}_*.csv'
+                patronEspecifico: 'ARCHIVO_CUATRO_{fecha}_*.csv',
+                horaEspecifica:   '18:45',
+                estado:           'ACTIVO'
             ],
             [
                 nombre:           'ARCHIVO_CINCO_{fecha}.csv',
                 rutaEspecifica:   '/PROYECTO/Report/RUTA5',
-                patronEspecifico: 'ARCHIVO_CINCO_{fecha}_*.csv'
+                patronEspecifico: 'ARCHIVO_CINCO_{fecha}_*.csv',
+                horaEspecifica:   '18:45',
+                estado:           'ACTIVO'
             ]
         ]
     }
