@@ -157,7 +157,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
 1. Busca el CSV `*_ENVIOCC_<AAAA-MM-DD>.csv` en `rutaBase/{mes}`. Si no existe → `CSV_NO_ENCONTRADO` (correo, sin fallar).
    Si hay **varios**, usa el **más reciente** por fecha de modificación (`buscar()` de este step lista con `ls -1t`); el log muestra todos.
 2. Copia el CSV al workspace **con su nombre original** (se adjunta al correo, `ec.adjunto`) y extrae todos los valores de la columna `FILENAMEFIELD`.
-3. Busca en `rutaPdf` (`/Sistema/Proyecto/test/PDF`) los PDF `<prefijoPdf>CCTEST_*_<dd_MM_yyyy>.pdf` (fecha **día_mes_año** al final; número del medio aleatorio). `prefijoPdf = ''` cuando los PDF empiezan con `CCTEST` (caso actual); `'*_'` si empiezan con números + `_`.
+3. Busca en `rutaPdf` (`/Sistema/Proyecto/test/PDF`) los PDF `CCTEST_*_<dd_MM_yyyy>.pdf` (empiezan con `textoPdf`; fecha **día_mes_año** al final; número del medio aleatorio).
 4. **Normaliza** ambos lados quitando los números iniciales y la extensión: `2131231232_CCTEST_123213123213_09_10_2026.pdf` → `CCTEST_123213123213_09_10_2026`.
 5. Compara los dos conjuntos:
    - **Faltan PDF** (están en la columna, no hay PDF) → acción: **generar ticket (faltan PDF)**.
