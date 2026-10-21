@@ -164,7 +164,7 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
    - **Sobran PDF** (hay PDF, no están en la columna) → acción: **generar ticket solicitando el CSV para diferenciar**.
 - En el correo aparece como **una fila más de la tabla** (`COM_ID 67`, `DES`): `OK` si todo coincide, `ERROR` en cualquier otro caso, y debajo una
   sección `Detalle ENVIOCC` con los nombres que faltan o sobran.
-- Config (`enviocc { }`): `COM_ID`, `DES`, `textoCsv`, `formatoFechaCsv`, `separador`, `columna`, `rutaPdf`, `formatoFechaPdf`, `prefijoPdf`, `textoPdf`, `extensionPdf`.
+- Config (`enviocc { }`): `COM_ID`, `DES`, `textoCsv`, `formatoFechaCsv`, `separador`, `columna`, `rutaPdf`, `formatoFechaPdf`, `textoPdf`, `extensionPdf`.
 - Estados: `OK`, `DIFERENCIAS`, `CSV_NO_ENCONTRADO`, `RUTA_PDF_NO_ACCESIBLE`, `ERROR_PROCESO`.
 
 ### 5.4 Horario y cron
