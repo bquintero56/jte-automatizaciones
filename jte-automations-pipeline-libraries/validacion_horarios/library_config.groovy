@@ -32,6 +32,7 @@ fields {
             columna         = String
             rutaPdf         = String
             formatoFechaPdf = String
+            prefijoPdf      = String
             textoPdf        = String
             extensionPdf    = String
         }

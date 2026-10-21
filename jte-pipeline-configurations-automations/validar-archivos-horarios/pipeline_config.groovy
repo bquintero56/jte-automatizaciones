@@ -71,6 +71,7 @@ libraries {
 
             rutaPdf         = '/Sistema/Proyecto/test/PDF'
             formatoFechaPdf = '%d_%m_%Y'          // 09_10_2026
+            prefijoPdf      = ''                  // '' = los PDF empiezan con CCTEST; '*_' = empiezan con números + "_"
             textoPdf        = 'CCTEST'
             extensionPdf    = '.pdf'
         }

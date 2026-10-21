@@ -25,7 +25,8 @@ date -d '${config.diasAtras} days ago' +'${config.formatoMes}'
 
     def rutaCsv   = config.rutaBase.replace('{mes}', mes)
     def patronCsv = "*_${c.textoCsv}_${fechaCsv}.csv"
-    def patronPdf = "*_${c.textoPdf}_*_${fechaPdf}${c.extensionPdf}"
+    // prefijoPdf: '' = los PDF empiezan con textoPdf (CCTEST_..._21_10_2026.pdf); '*_' = empiezan con números + "_"
+    def patronPdf = "${c.prefijoPdf}${c.textoPdf}_*_${fechaPdf}${c.extensionPdf}"
 
     // Busca en una ruta los archivos que coinciden con el patrón.
     // Devuelve null si la ruta no es accesible, o la lista de coincidencias (vacía si no hay).
