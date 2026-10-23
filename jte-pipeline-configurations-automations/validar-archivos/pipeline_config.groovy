@@ -28,7 +28,6 @@ libraries {
 
         // Horarios (HH:mm en zonaHoraria). Cada ejecución envía su propio correo con lo que validó.
         horaRutaGeneral = '10:15'             // ruta general: siempre los 5 archivos (sin pausa)
-        ventanaMinutos  = 30                  // tolerancia si Jenkins arranca tarde: 11:20 sigue contando como 11:15
 
         rutaGeneral    = '/data/entrada'      // donde deben estar los 5 archivos
 

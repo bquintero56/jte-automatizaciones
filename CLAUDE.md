@@ -110,13 +110,13 @@ jte-pipelines-template/
 **Un correo por ejecución** (3 al día) con lo validado en ese horario. `PAUSADO` no cuenta como faltante (no cambia el color del build).
 
 - **Config (`validacion_archivos`):** `host`, `user`, `runAsUser`, `formatoFecha` (`%Y%m%d`), `zonaHoraria`, `diasAtras`, `estadoSiFaltan`,
-  `horaRutaGeneral`, `ventanaMinutos` (30), `rutaGeneral`, `archivos` (lista de
+  `horaRutaGeneral`, `rutaGeneral`, `archivos` (lista de
   `[nombre, rutaEspecifica, patronEspecifico, horaEspecifica, estado]`).
 - **Ejecución:** `programar_validaciones()` (primera línea del template) valida horas y estados y registra el cron con las horas únicas
   (`horaRutaGeneral` + cada `horaEspecifica`) en `zonaHoraria`, más el parámetro **`HORARIO` solo para pruebas** (vacío = automático, lo
   que usa el cron; `TODOS` = ruta general y todas las específicas; `HH:mm` = simula ese horario).
-- **Horario de la ejecución:** la hora programada más reciente con `0 <= (hora actual - hora) < ventanaMinutos` (si Jenkins arranca tarde,
-  11:20 sigue siendo 11:15). Si no cae en ninguno, no valida ni envía correo.
+- **Horario de la ejecución:** la **última hora programada que ya pasó** (`hora actual >= hora`; si Jenkins arranca un minuto tarde,
+  11:16 sigue siendo 11:15). Antes de la primera hora del día no valida ni envía correo. Sin ventana de tolerancia (`ventanaMinutos` se quitó).
 - **Step `validar_archivos(modo)`** devuelve `[fecha, horario, descripcion, resultados]`; por archivo: `[proceso, archivo, estatus, rutas, fecha]`.
   `rutas` = solo las rutas validadas en este horario (general, específica o ambas con `TODOS`), cada una con su estatus `OK` / `ERROR` /
   `PAUSADO` (una ruta no accesible es `ERROR` y el motivo queda en el log).

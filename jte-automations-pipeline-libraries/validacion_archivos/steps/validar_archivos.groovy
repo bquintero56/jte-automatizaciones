@@ -35,7 +35,7 @@ date +'%H:%M'
         return p[0].toInteger() * 60 + p[1].toInteger()
     }
 
-    // El horario es la hora programada más reciente dentro de la ventana (por si Jenkins arranca tarde)
+    // El horario es la última hora programada que ya pasó (si Jenkins arranca un minuto tarde, 11:16 sigue siendo 11:15)
     def horas = [config.horaRutaGeneral]
     config.archivos.each { item -> horas << item.horaEspecifica }
     horas = horas.collect { String.valueOf(it).trim() }.unique()
@@ -45,7 +45,7 @@ date +'%H:%M'
         def ref        = aMinutos(referencia)
         def candidatas = horas.findAll { h ->
             def diff = ref - aMinutos(h)
-            return (diff >= 0 && diff < config.ventanaMinutos)
+            return (diff >= 0)
         }
         if (candidatas) {
             def max = candidatas.collect { aMinutos(it) }.max()
@@ -67,7 +67,7 @@ date +'%H:%M'
          (descripcion ? " → ${descripcion}" : '')
 
     if (!validarGeneral && !especificos) {
-        echo "No hay validaciones programadas para las ${referencia} (horarios: ${horas.join(', ')}; ventana de ${config.ventanaMinutos} min)"
+        echo "No hay validaciones programadas antes de las ${referencia} (horarios: ${horas.join(', ')})"
         return [fecha: fecha, horario: null, descripcion: '', resultados: []]
     }
 
