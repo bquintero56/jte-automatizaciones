@@ -11,13 +11,16 @@ repo con su **Base Directory**:
 
 ```
 jte-pipeline-configurations-automations/
-├── validar-archivos/pipeline_config.groovy            Pipeline 1 (ruta general + ruta específica)
-└── validar-archivos-horarios/pipeline_config.groovy   Pipeline 2 (horarios + SIN_APROBADO + ENVIOCC)
+├── validar-archivos/pipeline_config.groovy            Pipeline 1 (ruta general + rutas específicas por horario)
+├── validar-archivos-horarios/pipeline_config.groovy   Pipeline 2 (validaciones + SIN_APROBADO + ENVIOCC)
+└── validar-rutas-especificas/pipeline_config.groovy   Pipeline 3 (archivo del día en 4 rutas específicas)
 
 jte-automations-pipeline-libraries/
 ├── validacion_archivos/                               Librería del pipeline 1
 │   ├── library_config.groovy
-│   └── steps/validar_archivos.groovy
+│   └── steps/
+│       ├── programar_validaciones.groovy
+│       └── validar_archivos.groovy
 ├── validacion_horarios/                               Librería del pipeline 2
 │   ├── library_config.groovy
 │   └── steps/
@@ -25,15 +28,22 @@ jte-automations-pipeline-libraries/
 │       ├── validar_archivos_horario.groovy
 │       ├── procesar_sin_aprobado.groovy
 │       └── procesar_enviocc.groovy
-└── notificacion_correo/                               Compartida por los dos pipelines
+├── validacion_rutas/                                  Librería del pipeline 3
+│   ├── library_config.groovy
+│   └── steps/
+│       ├── programar_validacion_rutas.groovy
+│       └── validar_rutas.groovy
+└── notificacion_correo/                               Compartida por los tres pipelines
     ├── library_config.groovy
     └── steps/
         ├── enviar_correo_validacion_archivos.groovy   Correo del pipeline 1
-        └── enviar_correo_resultados.groovy            Correo del pipeline 2 (3 secciones)
+        ├── enviar_correo_resultados.groovy            Correo del pipeline 2 (3 secciones)
+        └── enviar_correo_validacion_rutas.groovy      Correo del pipeline 3
 
 jte-pipelines-template/
 ├── validar-archivos/validar_archivos.groovy
-└── validar-archivos-horarios/validar_archivos_horarios.groovy
+├── validar-archivos-horarios/validar_archivos_horarios.groovy
+└── validar-rutas-especificas/validar_rutas_especificas.groovy
 ```
 
 ## Antes de ejecutar

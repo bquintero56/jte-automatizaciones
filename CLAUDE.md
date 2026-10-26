@@ -10,6 +10,8 @@ servidor remoto, comprueban que existan archivos (CSV y PDF) en ciertas rutas y 
 - **Pipeline 1 – `validar-archivos`**: verifica que 5 archivos existan en una ruta general y también en su ruta específica.
 - **Pipeline 2 – `validar-archivos-horarios`**: tres tareas en un mismo job (10 validaciones de archivos, `SIN_APROBADO` y
   `ENVIOCC`) con **un único correo** al final.
+- **Pipeline 3 – `validar-rutas-especificas`**: busca el archivo del día (ej. `testSiniestro_<fecha>.zip`) en 4 rutas específicas y envía
+  un correo con `OK` / `ERROR` por ruta (ver §5B).
 
 Regla general: **un archivo faltante NO debe poner el pipeline en rojo**. Se informa por correo y en el log.
 
@@ -38,7 +40,8 @@ Todo vive en el repo `jte-automatizaciones`; en Jenkins cada fuente JTE apunta a
 ```
 jte-pipeline-configurations-automations/
 ├── validar-archivos/pipeline_config.groovy
-└── validar-archivos-horarios/pipeline_config.groovy
+├── validar-archivos-horarios/pipeline_config.groovy
+└── validar-rutas-especificas/pipeline_config.groovy
 
 jte-automations-pipeline-libraries/
 ├── validacion_archivos/                      (pipeline 1)
@@ -53,15 +56,22 @@ jte-automations-pipeline-libraries/
 │       ├── validar_archivos_horario.groovy   las 10 validaciones
 │       ├── procesar_sin_aprobado.groovy      tarea SIN_APROBADO
 │       └── procesar_enviocc.groovy           tarea ENVIOCC
+├── validacion_rutas/                         (pipeline 3)
+│   ├── library_config.groovy
+│   └── steps/
+│       ├── programar_validacion_rutas.groovy cron diario (config.hora)
+│       └── validar_rutas.groovy              busca el archivo del día en cada ruta
 └── notificacion_correo/                      (compartida)
     ├── library_config.groovy
     └── steps/
         ├── enviar_correo_validacion_archivos.groovy   correo del pipeline 1
-        └── enviar_correo_resultados.groovy            correo del pipeline 2 (3 secciones)
+        ├── enviar_correo_resultados.groovy            correo del pipeline 2 (3 secciones)
+        └── enviar_correo_validacion_rutas.groovy      correo del pipeline 3
 
 jte-pipelines-template/
 ├── validar-archivos/validar_archivos.groovy
-└── validar-archivos-horarios/validar_archivos_horarios.groovy
+├── validar-archivos-horarios/validar_archivos_horarios.groovy
+└── validar-rutas-especificas/validar_rutas_especificas.groovy
 ```
 
 ## 3. Convenciones técnicas (respetarlas al modificar)
@@ -188,6 +198,23 @@ Un solo job, **una sola ejecución diaria a las 15:00 hora de Chile** (`America/
   comas, rutas relativas al workspace; por eso el correo se envía antes del `clean_job_workspace()` del `finally`) y el cuerpo los lista
   ("Se adjuntan los archivos encontrados (N)"). Lo que no se encontró no se adjunta. **Nada se archiva en Jenkins** (sin `archiveArtifacts`).
 - Cada tarea tiene su propio `try/catch` en el template: si una falla por error técnico, aparece como `ERROR_PROCESO` en el correo y el build queda amarillo, sin perder el resto.
+
+## 5B. Pipeline 3 – `validar-rutas-especificas`
+
+**Objetivo:** una vez al día, a `hora` (en `zonaHoraria = 'America/Santiago'`), buscar el archivo del **día de ejecución** (`diasAtras = 0`)
+en cada una de las **4 rutas específicas** y enviar **un correo** con `OK` / `ERROR` por ruta. No hay ruta general, pausa ni adjuntos.
+
+- **Config (`validacion_rutas`):** `host`, `user`, `runAsUser`, `zonaHoraria`, `hora`, `formatoFecha` (`%Y%m%d`), `diasAtras`,
+  `estadoSiFaltan`, `archivos` (lista de `[nombre, ruta]`, opcional `proceso`). `nombre` admite comodín `*` y `{fecha}`
+  (ej. `testSiniestro_{fecha}.zip`).
+- **Ejecución:** `programar_validacion_rutas()` (primera línea del template) valida `hora` y registra el cron diario. Ejecución manual
+  (*Build*) = misma validación.
+- **Step `validar_rutas()`**: `buscar()` con `ls -1t` (si hay varios, el más reciente); devuelve por archivo
+  `[proceso, archivo, ruta, estatus, encontrado, fecha]`. Una ruta no accesible es `ERROR` y el motivo queda en el log.
+- **Correo (`enviar_correo_validacion_rutas(resultados)`):** se envía **siempre**. Tabla `PROCESO | RUTA | ESTATUS` (una fila por ruta),
+  `OK` verde y `ERROR` rojo; asunto `<asuntoPrefijo> <nombres> <asuntoSufijo> - <fecha>`; destinatarios y CC de su propio
+  `notificacion_correo`.
+- Pendiente de confirmar: `hora`, `formatoFecha` real del nombre y las 4 rutas (en la config están con valores de ejemplo, `AJUSTAR`).
 
 ## 6. Decisiones tomadas y supuestos
 
