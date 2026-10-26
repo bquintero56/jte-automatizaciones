@@ -214,7 +214,7 @@ en cada una de las **4 rutas específicas** y enviar **un correo** con `OK` / `E
 - **Correo (`enviar_correo_validacion_rutas(resultados)`):** se envía **siempre**. Tabla `PROCESO | RUTA | ESTATUS` (una fila por ruta),
   `OK` verde y `ERROR` rojo; asunto `<asuntoPrefijo> <nombres> <asuntoSufijo> - <fecha>`; destinatarios y CC de su propio
   `notificacion_correo`.
-- Pendiente de confirmar: `hora`, `formatoFecha` real del nombre y las 4 rutas (en la config están con valores de ejemplo, `AJUSTAR`).
+- `hora = '18:30'` y `formatoFecha = '%Y%m%d'` (ej. `20260926`) confirmados. Pendiente: las 4 rutas reales (en la config están de ejemplo, `AJUSTAR`).
 
 ## 6. Decisiones tomadas y supuestos
 

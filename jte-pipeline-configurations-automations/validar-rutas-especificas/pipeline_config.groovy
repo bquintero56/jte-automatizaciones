@@ -18,8 +18,8 @@ libraries {
         user           = 'svc_jenkins'
         runAsUser      = 'usr_datos'
         zonaHoraria    = 'America/Santiago'   // hora del cron y fecha de los archivos en hora de Chile
-        hora           = '09:00'              // AJUSTAR: ejecución diaria (HH:mm en zonaHoraria)
-        formatoFecha   = '%Y%m%d'             // AJUSTAR: fecha en el nombre del archivo (20261026)
+        hora           = '18:30'              // ejecución diaria (HH:mm en zonaHoraria)
+        formatoFecha   = '%Y%m%d'             // fecha en el nombre del archivo: año mes día (20260926)
         diasAtras      = 0                    // 0 = archivos del día de ejecución (producción), 1 = día anterior (pruebas)
         estadoSiFaltan = 'SUCCESS'            // SUCCESS, UNSTABLE o FAILURE
 
