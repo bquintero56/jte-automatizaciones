@@ -1,7 +1,7 @@
 // Valida lo que toca en este horario:
 //  - horaRutaGeneral → la ruta general de TODOS los archivos (sin pausa)
 //  - horaEspecifica  → la ruta específica de los archivos de ese horario (estado PAUSADO = no se busca, sale PAUSADO)
-// En la ruta general, nombre admite {fecha} y {mes}; con modificadoMismoDia = true además se exige que el archivo
+// En la ruta general, nombre admite {fecha}, {mes} y comodín * (si hay varios, se toma el más reciente); con modificadoMismoDia = true además se exige que el archivo
 // se haya modificado el día de ejecución (fecha de modificación del servidor, en zonaHoraria).
 // modo: vacío = según la hora actual (cron); TODOS = todo (pruebas); HH:mm = simula ese horario (pruebas).
 // Devuelve [fecha, horario, descripcion, resultados]; resultados por archivo: [proceso, archivo, estatus, rutas, fecha].
@@ -78,7 +78,7 @@ date +'%H:%M'
         return [fecha: fecha, horario: null, descripcion: '', resultados: []]
     }
 
-    // Busca en una ruta los archivos que coinciden con el patrón.
+    // Busca en una ruta los archivos que coinciden con el patrón (el más reciente primero, ls -1t).
     // Devuelve null si la ruta no es accesible, o la lista de coincidencias (vacía si no hay).
     def buscar = { String ruta, String patron ->
         // Una sola conexión: lista la carpeta en un archivo local; el rc indica si la ruta es accesible
@@ -86,7 +86,7 @@ date +'%H:%M'
             returnStatus: true,
             script: """#!/bin/sh
 ssh -o StrictHostKeyChecking=no ${user}@${host} \\
-    "sudo -n -u ${runAsUser} test -d '${ruta}' && sudo -n -u ${runAsUser} ls -1 '${ruta}'" > buscar_listado.txt
+    "sudo -n -u ${runAsUser} test -d '${ruta}' && sudo -n -u ${runAsUser} ls -1t '${ruta}'" > buscar_listado.txt
 """
         )
         if (rc != 0) {
@@ -134,15 +134,15 @@ fi
         def rutaEsp = item.rutaEspecifica
         def rutas   = []
 
-        // Nombre corto: sin {fecha}, {mes} ni .csv (y sin "_" sobrante al final)
-        def nombreCorto = item.nombre.replace('{fecha}', '').replace('{mes}', '').replace('.csv', '')
+        // Nombre corto: sin {fecha}, {mes}, * ni .csv (y sin "_" sobrante al final)
+        def nombreCorto = item.nombre.replace('{fecha}', '').replace('{mes}', '').replace('*', '').replace('.csv', '')
         if (nombreCorto.endsWith('_')) {
             nombreCorto = nombreCorto.substring(0, nombreCorto.length() - 1)
         }
 
         echo "------ ${nombre} ------"
 
-        // 1) Ruta general (nombre exacto): siempre se valida en su horario, sin pausa
+        // 1) Ruta general (nombre exacto o con comodín): siempre se valida en su horario, sin pausa
         if (validarGeneral) {
             totalChecks++
             def okGeneral = false

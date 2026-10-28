@@ -113,7 +113,8 @@ jte-pipelines-template/
 (hora de Chile, `zonaHoraria = 'America/Santiago'`):
 1. **Ruta general** (`rutaGeneral`, ej. `/data/entrada`) a las **`horaRutaGeneral` (10:15)**: nombre exacto, `REPORTE_{fecha}.csv`.
    Se validan **siempre los 5** archivos (no admite pausa).
-   El nombre admite `{mes}` (`formatoMes = '%Y%m'`, ej. `ARCHIVO_DOS_202610.csv`) además de `{fecha}`. Con `modificadoMismoDia: true`
+   El nombre admite `{mes}` (`formatoMes = '%Y%m'`) además de `{fecha}`, y comodín `*`: `ARCHIVO_DOS_{mes}*.csv` encuentra
+   `ARCHIVO_DOS_2026102133.csv` (año-mes seguido de otros números). Si hay varios, se toma el **más reciente** (`buscar()` usa `ls -1t`). Con `modificadoMismoDia: true`
    el archivo, además de existir, debe tener **fecha de modificación = día de ejecución** (se lee con `ls -l --time-style=+%s`, en epoch,
    y se convierte en el nodo con `zonaHoraria`); si existe pero es de otro día sale `ERROR` y el log dice la fecha de modificación.
 2. **Ruta específica** de cada archivo (`rutaEspecifica`) a su **`horaEspecifica`** (hoy 11:15 o 18:45): nombre con comodín

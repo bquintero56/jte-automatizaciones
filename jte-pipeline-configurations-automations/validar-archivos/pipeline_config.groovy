@@ -34,7 +34,7 @@ libraries {
 
         // Por archivo: horaEspecifica = cuándo se valida su ruta específica; estado = 'ACTIVO' o 'PAUSADO'
         // (PAUSADO: no se busca en la ruta específica y en el correo sale PAUSADO; la ruta general sí se valida)
-        // nombre admite {fecha} o {mes}; modificadoMismoDia: true = en la ruta general, además de existir, debe
+        // nombre admite {fecha}, {mes} y comodín * (si hay varios, se valida el más reciente); modificadoMismoDia: true = en la ruta general, además de existir, debe
         // haberse modificado el día de ejecución (opcional, por defecto false)
         archivos = [
             [
@@ -45,7 +45,7 @@ libraries {
                 estado:           'ACTIVO'
             ],
             [
-                nombre:             'ARCHIVO_DOS_{mes}.csv',            // AJUSTAR: el archivo que va con año-mes (202610)
+                nombre:             'ARCHIVO_DOS_{mes}*.csv',           // AJUSTAR: año-mes + otros números (ARCHIVO_DOS_2026102133.csv)
                 modificadoMismoDia: true,                               // y debe estar modificado hoy
                 rutaEspecifica:     '/PROYECTO/Report/RUTA2',
                 patronEspecifico:   'ARCHIVO_DOS_{fecha}_*.csv',
