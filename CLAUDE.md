@@ -4,14 +4,17 @@ Idioma de trabajo: **español** (comentarios, logs, mensajes de error y correos)
 
 ## 1. Qué es esto
 
-Dos pipelines de **monitoreo** que corren en Jenkins con **Jenkins Templating Engine (JTE)**. Se conectan por SSH a un
-servidor remoto, comprueban que existan archivos (CSV y PDF) en ciertas rutas y envían **un correo HTML** con el resultado.
+Pipelines de **monitoreo** que corren en Jenkins con **Jenkins Templating Engine (JTE)**. Los tres primeros se conectan por SSH a un
+servidor remoto y comprueban que existan archivos (CSV, PDF, ZIP) en ciertas rutas; el cuarto llama a servicios REST/SOAP. Todos envían
+**un correo HTML** con el resultado.
 
 - **Pipeline 1 – `validar-archivos`**: verifica que 5 archivos existan en una ruta general y también en su ruta específica.
 - **Pipeline 2 – `validar-archivos-horarios`**: tres tareas en un mismo job (10 validaciones de archivos, `SIN_APROBADO` y
   `ENVIOCC`) con **un único correo** al final.
 - **Pipeline 3 – `validar-rutas-especificas`**: busca el archivo del día (ej. `testSiniestro_<fecha>.zip`) en 4 rutas específicas y envía
   un correo con `OK` / `ERROR` por ruta (ver §5B).
+- **Pipeline 4 – `consultar-servicios`**: llama con `curl` a servicios REST/SOAP (consultas que antes se hacían en SoapUI) y envía un
+  correo con el código HTTP y `OK` / `ERROR` por consulta (ver §5C). No usa SSH.
 
 Regla general: **un archivo faltante NO debe poner el pipeline en rojo**. Se informa por correo y en el log.
 
@@ -41,7 +44,8 @@ Todo vive en el repo `jte-automatizaciones`; en Jenkins cada fuente JTE apunta a
 jte-pipeline-configurations-automations/
 ├── validar-archivos/pipeline_config.groovy
 ├── validar-archivos-horarios/pipeline_config.groovy
-└── validar-rutas-especificas/pipeline_config.groovy
+├── validar-rutas-especificas/pipeline_config.groovy
+└── consultar-servicios/pipeline_config.groovy
 
 jte-automations-pipeline-libraries/
 ├── validacion_archivos/                      (pipeline 1)
@@ -61,17 +65,24 @@ jte-automations-pipeline-libraries/
 │   └── steps/
 │       ├── programar_validacion_rutas.groovy cron diario (config.hora)
 │       └── validar_rutas.groovy              busca el archivo del día en cada ruta
+├── consultas_servicios/                      (pipeline 4)
+│   ├── library_config.groovy
+│   └── steps/
+│       ├── programar_consultas.groovy        cron diario (config.hora)
+│       └── ejecutar_consultas.groovy         curl a cada consulta y valida el código HTTP
 └── notificacion_correo/                      (compartida)
     ├── library_config.groovy
     └── steps/
         ├── enviar_correo_validacion_archivos.groovy   correo del pipeline 1
         ├── enviar_correo_resultados.groovy            correo del pipeline 2 (3 secciones)
-        └── enviar_correo_validacion_rutas.groovy      correo del pipeline 3
+        ├── enviar_correo_validacion_rutas.groovy      correo del pipeline 3
+        └── enviar_correo_consultas.groovy             correo del pipeline 4
 
 jte-pipelines-template/
 ├── validar-archivos/validar_archivos.groovy
 ├── validar-archivos-horarios/validar_archivos_horarios.groovy
-└── validar-rutas-especificas/validar_rutas_especificas.groovy
+├── validar-rutas-especificas/validar_rutas_especificas.groovy
+└── consultar-servicios/consultar_servicios.groovy
 ```
 
 ## 3. Convenciones técnicas (respetarlas al modificar)
@@ -219,6 +230,26 @@ en cada una de las **4 rutas específicas** y enviar **un correo** con `OK` / `E
   `OK` verde y `ERROR` rojo; asunto `<asuntoPrefijo> <nombres> <asuntoSufijo> - <fecha>`; destinatarios y CC de su propio
   `notificacion_correo`.
 - `hora = '18:30'` y `formatoFecha = '%Y%m%d'` (ej. `20260926`) confirmados. Pendiente: las 4 rutas reales (en la config están de ejemplo, `AJUSTAR`).
+
+## 5C. Pipeline 4 – `consultar-servicios`
+
+**Objetivo:** una vez al día, a `hora` (en `zonaHoraria`), ejecutar cada consulta (REST o SOAP, las que antes se lanzaban desde un proyecto
+de SoapUI) y comprobar que responda con un código de `codigosOk` (hoy `[200]`). **Un correo siempre**, con el resultado de cada una.
+
+- **Sin SoapUI en el nodo:** los datos de cada request se copian del proyecto SoapUI a la config (`url` = `<con:originalUri>`, `metodo`,
+  `headers`, `body`). El nodo solo necesita `curl`. SOAP = `POST` con `Content-Type: text/xml` y header `SOAPAction`.
+- **Config (`consultas_servicios`):** `zonaHoraria`, `hora`, `timeoutSegundos`, `codigosOk`, `estadoSiFalla`, `consultas` (lista de
+  `[nombre, url, metodo]`; opcionales `headers` (mapa), `body`, `auth`, `credencial`, `codigosOk`).
+- **Autenticación sin secretos en el repo:** `auth = 'bearer'` → credencial *Secret text* (header `Authorization: Bearer`);
+  `auth = 'basic'` → credencial *Username with password* (`curl -u`). `credencial` es el ID en Jenkins; se usa `withCredentials`
+  (plugin Credentials Binding) y el secreto se expande en el shell, no en Groovy, así que Jenkins lo enmascara en el log.
+- **Step `ejecutar_consultas()`:** el cuerpo va a un archivo (`--data-binary @consulta_cuerpo.txt`) para no romper comillas; `curl -w`
+  devuelve código y tiempo. Sin respuesta (timeout, DNS, certificado) → código `000` y `ERROR` con el mensaje de curl. En error, el log
+  muestra los primeros 500 caracteres de la respuesta. Devuelve `[fecha, resultados]`; por consulta
+  `[nombre, metodo, url, codigo, tiempo, estatus, detalle]`. `estadoSiFalla` decide el color del build (igual que `estadoSiFaltan`).
+- **Correo (`enviar_correo_consultas(consulta)`):** tabla `SERVICIO | MÉTODO | CÓDIGO HTTP | TIEMPO | ESTATUS` y, si hay errores,
+  "Detalle de errores" con el motivo.
+- Pendiente: las consultas reales (en la config hay 2 de ejemplo, `AJUSTAR`), la `hora` y crear las credenciales en Jenkins.
 
 ## 6. Decisiones tomadas y supuestos
 
