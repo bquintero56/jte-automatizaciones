@@ -113,15 +113,18 @@ jte-pipelines-template/
 (hora de Chile, `zonaHoraria = 'America/Santiago'`):
 1. **Ruta general** (`rutaGeneral`, ej. `/data/entrada`) a las **`horaRutaGeneral` (10:15)**: nombre exacto, `REPORTE_{fecha}.csv`.
    Se validan **siempre los 5** archivos (no admite pausa).
+   El nombre admite `{mes}` (`formatoMes = '%Y%m'`, ej. `ARCHIVO_DOS_202610.csv`) además de `{fecha}`. Con `modificadoMismoDia: true`
+   el archivo, además de existir, debe tener **fecha de modificación = día de ejecución** (se lee con `ls -l --time-style=+%s`, en epoch,
+   y se convierte en el nodo con `zonaHoraria`); si existe pero es de otro día sale `ERROR` y el log dice la fecha de modificación.
 2. **Ruta específica** de cada archivo (`rutaEspecifica`) a su **`horaEspecifica`** (hoy 11:15 o 18:45): nombre con comodín
    (`patronEspecifico`, ej. `REPORTE_{fecha}_*.csv`), porque en esa ruta el nombre lleva números aleatorios.
    Con `estado = 'PAUSADO'` (monitoreo pausado, no se generan archivos) **no se busca** y sale `PAUSADO`; con `'ACTIVO'` se busca.
 
 **Un correo por ejecución** (3 al día) con lo validado en ese horario. `PAUSADO` no cuenta como faltante (no cambia el color del build).
 
-- **Config (`validacion_archivos`):** `host`, `user`, `runAsUser`, `formatoFecha` (`%Y%m%d`), `zonaHoraria`, `diasAtras`, `estadoSiFaltan`,
-  `horaRutaGeneral`, `rutaGeneral`, `archivos` (lista de
-  `[nombre, rutaEspecifica, patronEspecifico, horaEspecifica, estado]`).
+- **Config (`validacion_archivos`):** `host`, `user`, `runAsUser`, `formatoFecha` (`%Y%m%d`), `formatoMes` (`%Y%m`), `zonaHoraria`, `diasAtras`,
+  `estadoSiFaltan`, `horaRutaGeneral`, `rutaGeneral`, `archivos` (lista de
+  `[nombre, rutaEspecifica, patronEspecifico, horaEspecifica, estado]`; opcionales `proceso` y `modificadoMismoDia`).
 - **Ejecución:** `programar_validaciones()` (primera línea del template) valida horas y estados y registra el cron con las horas únicas
   (`horaRutaGeneral` + cada `horaEspecifica`) en `zonaHoraria`, más el parámetro **`HORARIO` solo para pruebas** (vacío = automático, lo
   que usa el cron; `TODOS` = ruta general y todas las específicas; `HH:mm` = simula ese horario).

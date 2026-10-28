@@ -21,7 +21,8 @@ libraries {
         host           = '10.20.30.40'
         user           = 'svc_jenkins'
         runAsUser      = 'usr_datos'
-        formatoFecha   = '%Y%m%d'
+        formatoFecha   = '%Y%m%d'                 // {fecha} en los nombres (20261028)
+        formatoMes     = '%Y%m'                   // {mes} en los nombres (202610)
         zonaHoraria    = 'America/Santiago'   // horas del cron y fecha de los archivos en hora de Chile
         diasAtras      = 0                    // 0 = archivos del día de ejecución (producción), 1 = día anterior (pruebas)
         estadoSiFaltan = 'SUCCESS'            // SUCCESS, UNSTABLE o FAILURE (PAUSADO no cuenta como faltante)
@@ -33,6 +34,8 @@ libraries {
 
         // Por archivo: horaEspecifica = cuándo se valida su ruta específica; estado = 'ACTIVO' o 'PAUSADO'
         // (PAUSADO: no se busca en la ruta específica y en el correo sale PAUSADO; la ruta general sí se valida)
+        // nombre admite {fecha} o {mes}; modificadoMismoDia: true = en la ruta general, además de existir, debe
+        // haberse modificado el día de ejecución (opcional, por defecto false)
         archivos = [
             [
                 nombre:           'REPORTE_{fecha}.csv',                // en la ruta general (exacto)
@@ -42,11 +45,12 @@ libraries {
                 estado:           'ACTIVO'
             ],
             [
-                nombre:           'ARCHIVO_DOS_{fecha}.csv',
-                rutaEspecifica:   '/PROYECTO/Report/RUTA2',
-                patronEspecifico: 'ARCHIVO_DOS_{fecha}_*.csv',
-                horaEspecifica:   '11:15',
-                estado:           'ACTIVO'
+                nombre:             'ARCHIVO_DOS_{mes}.csv',            // AJUSTAR: el archivo que va con año-mes (202610)
+                modificadoMismoDia: true,                               // y debe estar modificado hoy
+                rutaEspecifica:     '/PROYECTO/Report/RUTA2',
+                patronEspecifico:   'ARCHIVO_DOS_{fecha}_*.csv',
+                horaEspecifica:     '11:15',
+                estado:             'ACTIVO'
             ],
             [
                 nombre:           'ARCHIVO_TRES_{fecha}.csv',

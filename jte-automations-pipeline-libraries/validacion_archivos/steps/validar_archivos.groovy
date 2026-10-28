@@ -1,6 +1,8 @@
 // Valida lo que toca en este horario:
 //  - horaRutaGeneral → la ruta general de TODOS los archivos (sin pausa)
 //  - horaEspecifica  → la ruta específica de los archivos de ese horario (estado PAUSADO = no se busca, sale PAUSADO)
+// En la ruta general, nombre admite {fecha} y {mes}; con modificadoMismoDia = true además se exige que el archivo
+// se haya modificado el día de ejecución (fecha de modificación del servidor, en zonaHoraria).
 // modo: vacío = según la hora actual (cron); TODOS = todo (pruebas); HH:mm = simula ese horario (pruebas).
 // Devuelve [fecha, horario, descripcion, resultados]; resultados por archivo: [proceso, archivo, estatus, rutas, fecha].
 Map call(String modo = '') {
@@ -12,18 +14,23 @@ Map call(String modo = '') {
     def totalChecks = 0
     def pausados    = 0
 
-    // Fecha de los archivos (día de ejecución con diasAtras = 0) y hora actual, en la zona horaria de la config
+    // Fecha de los archivos (día de ejecución con diasAtras = 0), mes, día para comparar la modificación y hora actual,
+    // en la zona horaria de la config
     def datos = sh(
         returnStdout: true,
         script: """#!/bin/sh
 export TZ='${config.zonaHoraria}'
 date -d '${config.diasAtras} days ago' +'${config.formatoFecha}'
+date -d '${config.diasAtras} days ago' +'${config.formatoMes}'
+date -d '${config.diasAtras} days ago' +'%Y%m%d'
 date +'%H:%M'
 """
     ).trim().readLines()
 
     def fecha      = datos[0]
-    def horaActual = datos[1]
+    def mes        = datos[1]
+    def diaEjec    = datos[2]
+    def horaActual = datos[3]
 
     // ---------- ¿Qué horario es esta ejecución? ----------
     def m          = modo?.trim()
@@ -101,19 +108,34 @@ done < buscar_listado.txt
         return salida ? salida.readLines() : []
     }
 
+    // Día de modificación (AAAAMMDD en zonaHoraria) de un archivo del servidor; '' si no se pudo leer.
+    // ls entrega la fecha en segundos (epoch) para no depender de la zona horaria del servidor.
+    def diaModificacion = { String ruta, String archivo ->
+        return sh(
+            returnStdout: true,
+            script: """#!/bin/sh
+epoch=\$(ssh -o StrictHostKeyChecking=no ${user}@${host} \\
+    "sudo -n -u ${runAsUser} ls -l --time-style=+%s '${ruta}/${archivo}'" | awk '{print \$6}')
+if [ -n "\$epoch" ]; then
+    TZ='${config.zonaHoraria}' date -d "@\$epoch" +'%Y%m%d'
+fi
+"""
+        ).trim()
+    }
+
     config.archivos.each { item ->
         def especifico = esEspecifico(item)
         if (!validarGeneral && !especifico) {
             return      // este archivo no tiene nada que validar en este horario
         }
 
-        def nombre  = item.nombre.replace('{fecha}', fecha)
+        def nombre  = item.nombre.replace('{fecha}', fecha).replace('{mes}', mes)
         def patron  = item.patronEspecifico.replace('{fecha}', fecha)
         def rutaEsp = item.rutaEspecifica
         def rutas   = []
 
-        // Nombre corto: sin {fecha} ni .csv (y sin "_" sobrante al final)
-        def nombreCorto = item.nombre.replace('{fecha}', '').replace('.csv', '')
+        // Nombre corto: sin {fecha}, {mes} ni .csv (y sin "_" sobrante al final)
+        def nombreCorto = item.nombre.replace('{fecha}', '').replace('{mes}', '').replace('.csv', '')
         if (nombreCorto.endsWith('_')) {
             nombreCorto = nombreCorto.substring(0, nombreCorto.length() - 1)
         }
@@ -128,6 +150,17 @@ done < buscar_listado.txt
             if (enGeneral == null) {
                 echo "❌ [GENERAL] Ruta no accesible: ${config.rutaGeneral}"
                 faltantes << "[GENERAL] ${config.rutaGeneral}/${nombre} (ruta no accesible)"
+            } else if (enGeneral && item.modificadoMismoDia) {
+                // Además de existir, debe haberse modificado el día de ejecución
+                def diaMod = diaModificacion(config.rutaGeneral, enGeneral[0])
+                if (diaMod == diaEjec) {
+                    echo "✅ [GENERAL] ${config.rutaGeneral}/${enGeneral[0]} (modificado el ${diaMod})"
+                    okGeneral = true
+                } else {
+                    def motivo = diaMod ? "modificado el ${diaMod}, se esperaba ${diaEjec}" : 'no se pudo leer la fecha de modificación'
+                    echo "❌ [GENERAL] ${config.rutaGeneral}/${enGeneral[0]} existe pero ${motivo}"
+                    faltantes << "[GENERAL] ${config.rutaGeneral}/${nombre} (${motivo})"
+                }
             } else if (enGeneral) {
                 echo "✅ [GENERAL] ${config.rutaGeneral}/${enGeneral[0]}"
                 okGeneral = true
