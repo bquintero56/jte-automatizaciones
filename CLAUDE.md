@@ -250,7 +250,8 @@ de SoapUI) y comprobar que responda con un código de `codigosOk` (hoy `[200]`).
 - **Correo (`enviar_correo_consultas(consulta)`):** tabla `SERVICIO | MÉTODO | CÓDIGO HTTP | TIEMPO | ESTATUS` y, si hay errores,
   "Detalle de errores" con el motivo.
 - **Origen:** proyecto SoapUI `Consentimiento` (REST/JSON, no SOAP): 2 requests `POST` (`ReciboConsentimiento` con el JSON de
-  `Consentimiento` y `Cad` con `{}`), respuesta esperada `200`. `url` = `<con:endpoint>` del request + `path` del `<con:resource>`.
+  `Consentimiento` y `Cad` con `{}`), respuesta esperada `200`. `url` = `<con:originalUri>` del request, tal cual: en el XML real ya contiene endpoint + path
+  (confirmado por el usuario; el XML de ejemplo tiene valores cambiados y por eso no coinciden).
   Auth: perfil OAuth 2.0 `GENERALES` con token **pegado a mano** (`ENTERED_MANUALLY`, en el header) → `auth: 'bearer'` con credencial
   *Secret text* `token-oauth-generales`. Si el token expira, Jenkins no puede renovarlo solo (el flujo es *Authorization Code*, interactivo):
   habría que actualizar la credencial o, si el proveedor lo permite, obtenerlo con *client credentials* antes de las consultas.
