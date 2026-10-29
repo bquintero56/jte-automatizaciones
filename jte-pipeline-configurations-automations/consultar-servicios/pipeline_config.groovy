@@ -20,6 +20,10 @@ libraries {
         codigosOk       = [200]                // códigos HTTP que cuentan como OK
         estadoSiFalla   = 'SUCCESS'            // SUCCESS, UNSTABLE o FAILURE
 
+        // Proxy para salir a las APIs (curl --proxy). '' = sin proxy. Una consulta puede tener su propio proxy: (o '' para ir directo).
+        proxy           = 'http://proxy.empresa.cl:8080'   // AJUSTAR: host:puerto del proxy de la empresa
+        credencialProxy = ''                               // ID de credencial Username with password si el proxy pide usuario; '' = sin usuario
+
         // Una entrada por request del proyecto SoapUI "Consentimiento" (Consentimiento-soapui-project.xml):
         //   nombre     = texto de la columna SERVICIO del correo
         //   url        = <con:originalUri> del request, tal cual (ya trae el endpoint + el path del recurso)

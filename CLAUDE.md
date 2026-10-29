@@ -243,6 +243,10 @@ de SoapUI) y comprobar que responda con un código de `codigosOk` (hoy `[200]`).
 - **Autenticación sin secretos en el repo:** `auth = 'bearer'` → credencial *Secret text* (header `Authorization: Bearer`);
   `auth = 'basic'` → credencial *Username with password* (`curl -u`). `credencial` es el ID en Jenkins; se usa `withCredentials`
   (plugin Credentials Binding) y el secreto se expande en el shell, no en Groovy, así que Jenkins lo enmascara en el log.
+- **Proxy (opcional):** `proxy` general (`curl --proxy`, ej. `http://proxy.empresa.cl:8080`; `''` = directo) y `credencialProxy`
+  (*Username with password*, `--proxy-user`) si pide usuario. Una consulta puede definir su propio `proxy` (o `''` para ir directo).
+  Motivo: `curl: (6) Could not resolve host` desde el nodo (sin salida directa a internet). Todas las credenciales de una consulta van
+  en un solo `withCredentials`.
 - **Step `ejecutar_consultas()`:** el cuerpo va a un archivo (`--data-binary @consulta_cuerpo.txt`) para no romper comillas; `curl -w`
   devuelve código y tiempo. Sin respuesta (timeout, DNS, certificado) → código `000` y `ERROR` con el mensaje de curl. En error, el log
   muestra los primeros 500 caracteres de la respuesta. Devuelve `[fecha, resultados]`; por consulta

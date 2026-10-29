@@ -24,7 +24,10 @@ TZ='${config.zonaHoraria}' date +'%Y-%m-%d %H:%M'
         def auth   = String.valueOf(c.auth ?: '').trim().toLowerCase()
         def okList = (c.codigosOk ?: config.codigosOk).collect { it.toString() }
 
-        echo "------ ${nombre} (${metodo} ${c.url}) ------"
+        // Proxy: el de la consulta si lo define (aunque sea '' = sin proxy); si no, el general
+        def proxy = String.valueOf((c.containsKey('proxy') ? c.proxy : config.proxy) ?: '').trim()
+
+        echo "------ ${nombre} (${metodo} ${c.url}) ------" + (proxy ? " vía proxy ${proxy}" : '')
 
         // Headers y cuerpo (el cuerpo va a un archivo para no romper comillas ni saltos de línea)
         def headers = ''
@@ -39,7 +42,7 @@ TZ='${config.zonaHoraria}' date +'%Y-%m-%d %H:%M'
             datos = ' --data-binary @consulta_cuerpo.txt'
         }
 
-        // extra = autenticación; las variables se expanden en el shell, no en Groovy (el secreto no queda en el log)
+        // extra = autenticación y proxy; las variables se expanden en el shell, no en Groovy (el secreto no queda en el log)
         def invocar = { String extra ->
             return sh(
                 returnStatus: true,
@@ -53,16 +56,32 @@ curl -sS -X ${metodo} --max-time ${config.timeoutSegundos}${headers}${extra}${da
         def rc      = 0
         def detalle = ''
         try {
+            def credenciales = []
+            def extra        = ''
+
             if (auth == 'bearer') {
-                withCredentials([string(credentialsId: c.credencial, variable: 'AUTH_TOKEN')]) {
-                    rc = invocar(' -H "Authorization: Bearer $AUTH_TOKEN"')
-                }
+                credenciales << string(credentialsId: c.credencial, variable: 'AUTH_TOKEN')
+                extra += ' -H "Authorization: Bearer $AUTH_TOKEN"'
             } else if (auth == 'basic') {
-                withCredentials([usernamePassword(credentialsId: c.credencial, usernameVariable: 'AUTH_USER', passwordVariable: 'AUTH_PASS')]) {
-                    rc = invocar(' -u "$AUTH_USER:$AUTH_PASS"')
+                credenciales << usernamePassword(credentialsId: c.credencial, usernameVariable: 'AUTH_USER', passwordVariable: 'AUTH_PASS')
+                extra += ' -u "$AUTH_USER:$AUTH_PASS"'
+            }
+
+            if (proxy) {
+                extra += " --proxy ${q(proxy)}"
+                if (config.credencialProxy) {
+                    // Proxy con usuario y clave (credencial Username with password)
+                    credenciales << usernamePassword(credentialsId: config.credencialProxy, usernameVariable: 'PROXY_USER', passwordVariable: 'PROXY_PASS')
+                    extra += ' --proxy-user "$PROXY_USER:$PROXY_PASS"'
+                }
+            }
+
+            if (credenciales) {
+                withCredentials(credenciales) {
+                    rc = invocar(extra)
                 }
             } else {
-                rc = invocar('')
+                rc = invocar(extra)
             }
         }
         catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
