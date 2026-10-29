@@ -20,45 +20,91 @@ libraries {
         codigosOk       = [200]                // códigos HTTP que cuentan como OK
         estadoSiFalla   = 'SUCCESS'            // SUCCESS, UNSTABLE o FAILURE
 
-        // AJUSTAR: una entrada por consulta, copiando los datos del proyecto de SoapUI:
+        // Una entrada por request del proyecto SoapUI "Consentimiento" (Consentimiento-soapui-project.xml):
         //   nombre     = texto de la columna SERVICIO del correo
-        //   url        = <con:originalUri> / endpoint de la consulta
-        //   metodo     = GET, POST, PUT... (SOAP siempre es POST)
-        //   headers    = mapa de headers (Content-Type, SOAPAction...)
-        //   body       = cuerpo de la petición (JSON o sobre SOAP); opcional
+        //   url        = <con:endpoint> del request + path del <con:resource> (no el <con:originalUri>)
+        //   metodo     = atributo method del <con:method> (GET, POST...; SOAP siempre es POST)
+        //   headers    = mapa de headers (para SOAP: Content-Type text/xml y SOAPAction)
+        //   body       = contenido de <con:request> (JSON o sobre SOAP); opcional
         // Opcional: auth = 'basic' o 'bearer' + credencial = ID de la credencial en Jenkins
         //   (basic → Username with password; bearer → Secret text). NUNCA pongas tokens ni contraseñas aquí: el repo es público.
+        //   El perfil OAuth 2.0 "GENERALES" de SoapUI (token en el HEADER) = auth 'bearer' con el accessToken en la credencial.
         // Opcional: codigosOk = [200, 201] para sobrescribir el general en esa consulta.
         consultas = [
             [
-                nombre:  'Consentimiento',
-                url:     'https://api.ejemplo.com/consentimiento',
+                nombre:  'ReciboConsentimiento',
+                url:     'https://api-set.com/b/oConsentimiento.json',          // AJUSTAR: endpoint + path reales
                 metodo:  'POST',
                 headers: ['Content-Type': 'application/json'],
                 body:    '''{
-                    "Consentimiento": {
-                        "codigo": "AJUSTAR"
-                    }
-                }''',
+  "Consentimiento": {
+    "CodigoID": "000001",
+    "Llave": "76",
+    "Fecha": "2022/03/10 16:24:02",
+    "TipoIdentificacion": "RUT",
+    "NumeroIdentificacion": "73-8",
+    "NombreRazonSocial": "JREZ",
+    "Email": "ejemplo@chile.cl",
+    "Fono": "+0000",
+    "InformacionConsentir": {
+      "Rut": "-8",
+      "RazonSocial": "Generales",
+      "Grupo": "GENERALES",
+      "Asegurado": {
+        "TipoIdentificacion": "RUT",
+        "NumeroIdentificacion": "78",
+        "NombreRazonSocial": "RINO"
+      },
+      "Contratante": [
+        {
+          "TipoIdentificacion": "RUT",
+          "NumeroIdentificacion": "96837640-3",
+          "NombreRazonSocial": "generales"
+        }
+      ],
+      "DatosCorredorAsesor": {
+        "Corredor": [
+          {
+            "TipoIdentificacion": "RUT",
+            "NumeroIdentificacion": "132456789-K",
+            "NombreRazonSocial": "ROD"
+          }
+        ]
+      },
+      "DetallePoliza": {
+        "Pol": [
+          {
+            "Codigo": "12345",
+            "Ramo": "00012",
+            "FechaInicio": "2022/07/12",
+            "FechaTerminoIndeterminada": "NO",
+            "FechaTermino": "2022/08/14",
+            "Clausulas": [
+              {
+                "Codigo": "123456",
+                "Ramo": "00012",
+                "FechaInicio": "2022/01/12",
+                "FechaTerminoIndeterminada": "SI",
+                "FechaTermino": "2022/01/13"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}''',
                 auth:       'bearer',
-                credencial: 'token-api-consentimiento'
+                credencial: 'token-oauth-generales'                         // AJUSTAR: ID de la credencial Secret text
             ],
             [
-                nombre:  'Consulta SOAP',
-                url:     'https://api.ejemplo.com/servicio',
-                metodo:  'POST',
-                headers: [
-                    'Content-Type': 'text/xml; charset=UTF-8',
-                    'SOAPAction':   'AJUSTAR'
-                ],
-                body:    '''<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
-                    <soapenv:Header/>
-                    <soapenv:Body>
-                        <!-- AJUSTAR: el cuerpo de la consulta -->
-                    </soapenv:Body>
-                </soapenv:Envelope>''',
-                auth:       'basic',
-                credencial: 'usuario-servicio-soap'
+                nombre:     'Cad',
+                url:        'https://api-services.testnet.com/Cad.json',     // AJUSTAR: endpoint + path reales
+                metodo:     'POST',
+                headers:    ['Content-Type': 'application/json'],
+                body:       '{}',
+                auth:       'bearer',
+                credencial: 'token-oauth-generales'
             ]
         ]
     }

@@ -249,7 +249,12 @@ de SoapUI) y comprobar que responda con un código de `codigosOk` (hoy `[200]`).
   `[nombre, metodo, url, codigo, tiempo, estatus, detalle]`. `estadoSiFalla` decide el color del build (igual que `estadoSiFaltan`).
 - **Correo (`enviar_correo_consultas(consulta)`):** tabla `SERVICIO | MÉTODO | CÓDIGO HTTP | TIEMPO | ESTATUS` y, si hay errores,
   "Detalle de errores" con el motivo.
-- Pendiente: las consultas reales (en la config hay 2 de ejemplo, `AJUSTAR`), la `hora` y crear las credenciales en Jenkins.
+- **Origen:** proyecto SoapUI `Consentimiento` (REST/JSON, no SOAP): 2 requests `POST` (`ReciboConsentimiento` con el JSON de
+  `Consentimiento` y `Cad` con `{}`), respuesta esperada `200`. `url` = `<con:endpoint>` del request + `path` del `<con:resource>`.
+  Auth: perfil OAuth 2.0 `GENERALES` con token **pegado a mano** (`ENTERED_MANUALLY`, en el header) → `auth: 'bearer'` con credencial
+  *Secret text* `token-oauth-generales`. Si el token expira, Jenkins no puede renovarlo solo (el flujo es *Authorization Code*, interactivo):
+  habría que actualizar la credencial o, si el proveedor lo permite, obtenerlo con *client credentials* antes de las consultas.
+- Pendiente: URLs reales (`AJUSTAR`), la `hora`, crear la credencial en Jenkins y confirmar cuánto dura el token.
 
 ## 6. Decisiones tomadas y supuestos
 
