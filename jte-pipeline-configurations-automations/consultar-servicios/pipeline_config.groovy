@@ -22,7 +22,7 @@ libraries {
 
         // Una entrada por request del proyecto SoapUI "Consentimiento" (Consentimiento-soapui-project.xml):
         //   nombre     = texto de la columna SERVICIO del correo
-        //   url        = <con:endpoint> del request + path del <con:resource> (no el <con:originalUri>)
+        //   url        = <con:originalUri> del request (la URL completa)
         //   metodo     = atributo method del <con:method> (GET, POST...; SOAP siempre es POST)
         //   headers    = mapa de headers (para SOAP: Content-Type text/xml y SOAPAction)
         //   body       = contenido de <con:request> (JSON o sobre SOAP); opcional
@@ -33,7 +33,7 @@ libraries {
         consultas = [
             [
                 nombre:  'ReciboConsentimiento',
-                url:     'https://api-set.com/b/oConsentimiento.json',          // AJUSTAR: endpoint + path reales
+                url:     'https://api-entesCIA-ntimiento.json',                 // AJUSTAR: <con:originalUri> real
                 metodo:  'POST',
                 headers: ['Content-Type': 'application/json'],
                 body:    '''{
@@ -99,7 +99,7 @@ libraries {
             ],
             [
                 nombre:     'Cad',
-                url:        'https://api-services.testnet.com/Cad.json',     // AJUSTAR: endpoint + path reales
+                url:        'https://api-st.testnet.com/sCA/Coidad.json',    // AJUSTAR: <con:originalUri> real
                 metodo:     'POST',
                 headers:    ['Content-Type': 'application/json'],
                 body:       '{}',
