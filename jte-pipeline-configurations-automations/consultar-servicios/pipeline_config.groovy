@@ -30,7 +30,9 @@ libraries {
         //   (basic → Username with password; bearer → Secret text). NUNCA pongas tokens ni contraseñas aquí: el repo es público.
         //   El perfil OAuth 2.0 "GENERALES" de SoapUI (token en el HEADER) = auth 'bearer' con el accessToken en la credencial.
         // Opcional: codigosOk = [200, 201] para sobrescribir el general en esa consulta.
+        // Cada bloque [ ... ] es UNA consulta (un request del XML) y lleva UNA sola url: su <con:originalUri>.
         consultas = [
+            // ---- Consulta 1: <con:resource name="ReciboConsentimiento.json"> ----
             [
                 nombre:  'ReciboConsentimiento',
                 url:     'https://api-entesCIA-ntimiento.json',                 // AJUSTAR: <con:originalUri> real
@@ -97,6 +99,7 @@ libraries {
                 auth:       'bearer',
                 credencial: 'token-oauth-generales'                         // AJUSTAR: ID de la credencial Secret text
             ],
+            // ---- Consulta 2: <con:resource name="dad.json"> (body {}) ----
             [
                 nombre:     'Cad',
                 url:        'https://api-st.testnet.com/sCA/Coidad.json',    // AJUSTAR: <con:originalUri> real
