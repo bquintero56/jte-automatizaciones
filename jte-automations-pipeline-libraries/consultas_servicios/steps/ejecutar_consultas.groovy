@@ -1,5 +1,6 @@
 // Ejecuta con curl cada consulta de config.consultas (REST o SOAP) y valida el código HTTP contra codigosOk.
-// Las credenciales salen de Jenkins (withCredentials); nunca de la config.
+// Las credenciales salen de Jenkins (withCredentials); nunca de la config. Token bearer: por nombre (token) dentro del
+// Secret file credencialTokens, o una credencial Secret text propia (credencial).
 // Devuelve [fecha, resultados]; por consulta: [nombre, metodo, url, codigo, tiempo, estatus, detalle].
 Map call() {
     def fallidas   = []
@@ -42,11 +43,13 @@ TZ='${config.zonaHoraria}' date +'%Y-%m-%d %H:%M'
             datos = ' --data-binary @consulta_cuerpo.txt'
         }
 
-        // extra = autenticación y proxy; las variables se expanden en el shell, no en Groovy (el secreto no queda en el log)
-        def invocar = { String extra ->
+        // previo = líneas de shell antes del curl (leer el token del archivo); extra = autenticación y proxy.
+        // Las variables se expanden en el shell, no en Groovy (el secreto no queda en el log)
+        def invocar = { String previo, String extra ->
             return sh(
                 returnStatus: true,
                 script: """#!/bin/sh
+${previo}
 curl -sS -X ${metodo} --max-time ${config.timeoutSegundos}${headers}${extra}${datos} \\
     -o consulta_respuesta.txt -w '%{http_code} %{time_total}' ${q(c.url)} > consulta_estado.txt 2> consulta_error.txt
 """
@@ -57,9 +60,27 @@ curl -sS -X ${metodo} --max-time ${config.timeoutSegundos}${headers}${extra}${da
         def detalle = ''
         try {
             def credenciales = []
+            def previo       = ''
             def extra        = ''
 
-            if (auth == 'bearer') {
+            if (auth == 'bearer' && c.token) {
+                // Token por nombre dentro del Secret file credencialTokens (líneas NOMBRE=token)
+                def tokenNombre = String.valueOf(c.token).trim()
+                if (!(tokenNombre ==~ /[A-Za-z0-9_.-]+/)) {
+                    throw new IllegalArgumentException("nombre de token no válido: '${tokenNombre}' (usa letras, números, _ . -)")
+                }
+                if (!config.credencialTokens) {
+                    throw new IllegalArgumentException("la consulta usa token '${tokenNombre}' pero falta credencialTokens en la config")
+                }
+                credenciales << file(credentialsId: config.credencialTokens, variable: 'TOKENS_FILE')
+                // tr -d '\\r': el archivo puede venir de Windows; se toleran espacios alrededor del = y del valor
+                previo = """AUTH_TOKEN=\$(grep -m1 '^[[:space:]]*${tokenNombre}[[:space:]]*=' "\$TOKENS_FILE" | cut -d= -f2- | tr -d '\\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*\$//')
+if [ -z "\$AUTH_TOKEN" ]; then
+    echo "token '${tokenNombre}' no está en ${config.credencialTokens}" > consulta_error.txt
+    exit 90
+fi"""
+                extra += ' -H "Authorization: Bearer $AUTH_TOKEN"'
+            } else if (auth == 'bearer') {
                 credenciales << string(credentialsId: c.credencial, variable: 'AUTH_TOKEN')
                 extra += ' -H "Authorization: Bearer $AUTH_TOKEN"'
             } else if (auth == 'basic') {
@@ -78,10 +99,10 @@ curl -sS -X ${metodo} --max-time ${config.timeoutSegundos}${headers}${extra}${da
 
             if (credenciales) {
                 withCredentials(credenciales) {
-                    rc = invocar(extra)
+                    rc = invocar(previo, extra)
                 }
             } else {
-                rc = invocar(extra)
+                rc = invocar(previo, extra)
             }
         }
         catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {

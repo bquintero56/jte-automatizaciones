@@ -239,10 +239,16 @@ de SoapUI) y comprobar que responda con un código de `codigosOk` (hoy `[200]`).
 - **Sin SoapUI en el nodo:** los datos de cada request se copian del proyecto SoapUI a la config (`url` = `<con:originalUri>`, `metodo`,
   `headers`, `body`). El nodo solo necesita `curl`. SOAP = `POST` con `Content-Type: text/xml` y header `SOAPAction`.
 - **Config (`consultas_servicios`):** `zonaHoraria`, `hora`, `timeoutSegundos`, `codigosOk`, `estadoSiFalla`, `consultas` (lista de
-  `[nombre, url, metodo]`; opcionales `headers` (mapa), `body`, `auth`, `credencial`, `codigosOk`).
+  `[nombre, url, metodo]`; opcionales `headers` (mapa), `body`, `auth`, `token` o `credencial`, `codigosOk`, `proxy`); opcionales generales
+  `credencialTokens`, `proxy`, `credencialProxy`. Hoy hay 3 consultas de ejemplo (`Consentimiento CF_VIDA`, `Generales`, `VIDA`); serán las
+  6 del TestCase `SIC` del proyecto SoapUI `SICS`.
 - **Autenticación sin secretos en el repo:** `auth = 'bearer'` → credencial *Secret text* (header `Authorization: Bearer`);
   `auth = 'basic'` → credencial *Username with password* (`curl -u`). `credencial` es el ID en Jenkins; se usa `withCredentials`
   (plugin Credentials Binding) y el secreto se expande en el shell, no en Groovy, así que Jenkins lo enmascara en el log.
+- **Tokens en un solo *Secret file*:** `credencialTokens` = ID de una credencial *Secret file* con una línea `NOMBRE=token` por token
+  (ej. `CF_VIDA=eyJ...`). Cada consulta con `auth: 'bearer'` indica `token: 'NOMBRE'`; el shell lee la línea con `grep`/`cut`
+  (tolera `\r` de Windows y espacios) y el token nunca pasa por Groovy ni por el log. Si el nombre no está → `ERROR` "token 'X' no está en
+  …" (rc 90). El nombre solo admite `[A-Za-z0-9_.-]`. Sigue valiendo `credencial:` (Secret text propio) en vez de `token:`.
 - **Proxy (opcional):** `proxy` general (`curl --proxy`, ej. `http://proxy.empresa.cl:8080`; `''` = directo) y `credencialProxy`
   (*Username with password*, `--proxy-user`) si pide usuario. Una consulta puede definir su propio `proxy` (o `''` para ir directo).
   Motivo: `curl: (6) Could not resolve host` desde el nodo (sin salida directa a internet). Todas las credenciales de una consulta van

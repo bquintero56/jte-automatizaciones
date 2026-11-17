@@ -24,22 +24,25 @@ libraries {
         proxy           = 'http://proxy.empresa.cl:8080'   // AJUSTAR: host:puerto del proxy de la empresa
         credencialProxy = ''                               // ID de credencial Username with password si el proxy pide usuario; '' = sin usuario
 
-        // Una entrada por request del proyecto SoapUI "Consentimiento" (Consentimiento-soapui-project.xml):
-        //   nombre     = texto de la columna SERVICIO del correo
-        //   url        = <con:originalUri> del request, tal cual (ya trae el endpoint + el path del recurso)
-        //   metodo     = atributo method del <con:method> (GET, POST...; SOAP siempre es POST)
-        //   headers    = mapa de headers (para SOAP: Content-Type text/xml y SOAPAction)
-        //   body       = contenido de <con:request> (JSON o sobre SOAP); opcional
-        // Opcional: auth = 'basic' o 'bearer' + credencial = ID de la credencial en Jenkins
-        //   (basic → Username with password; bearer → Secret text). NUNCA pongas tokens ni contraseñas aquí: el repo es público.
-        //   El perfil OAuth 2.0 "GENERALES" de SoapUI (token en el HEADER) = auth 'bearer' con el accessToken en la credencial.
-        // Opcional: codigosOk = [200, 201] para sobrescribir el general en esa consulta.
-        // Cada bloque [ ... ] es UNA consulta (un request del XML) y lleva UNA sola url: su <con:originalUri>.
+        // Tokens: UNA credencial Secret file con una línea por token (NOMBRE=token). Cada consulta indica su NOMBRE en token:.
+        // En el repo solo van los nombres, nunca los valores (el repo es público).
+        credencialTokens = 'tokens-sics'                   // AJUSTAR: ID del Secret file creado en Jenkins
+
+        // Una entrada por consulta (un XML / request de SoapUI). Cada bloque [ ... ] es UNA consulta con UNA url:
+        //   nombre  = texto de la columna SERVICIO del correo
+        //   url     = <con:originalUri> del request, tal cual (ya trae el endpoint + el path del recurso)
+        //   metodo  = atributo method del <con:method> (GET, POST...; SOAP siempre es POST)
+        //   headers = mapa de headers (Content-Type = mediaType del <con:request>; para SOAP: text/xml y SOAPAction)
+        //   body    = contenido de <con:request> (JSON o sobre SOAP); opcional
+        //   auth    = 'bearer' (OAuth 2.0 de SoapUI, token en el HEADER)
+        //   token   = NOMBRE de la línea en el Secret file credencialTokens (ej. CF_VIDA=eyJ... → token: 'CF_VIDA')
+        // Alternativas: credencial: 'id-secret-text' en vez de token (una credencial propia), o auth 'basic' + credencial
+        // Username with password. Opcional: codigosOk = [200, 201] para sobrescribir el general; proxy propio.
         consultas = [
-            // ---- Consulta 1: <con:resource name="ReciboConsentimiento.json"> ----
+            // ---- Consulta 1 ----
             [
-                nombre:  'ReciboConsentimiento',
-                url:     'https://api-entesCIA-ntimiento.json',                 // AJUSTAR: <con:originalUri> real
+                nombre:  'Consentimiento CF_VIDA',
+                url:     'https://api.ejemplo.cl/cf-vida/ReciboConsentimiento.json',   // AJUSTAR: <con:originalUri>
                 metodo:  'POST',
                 headers: ['Content-Type': 'application/json'],
                 body:    '''{
@@ -100,19 +103,38 @@ libraries {
     }
   }
 }''',
-                auth:       'bearer',
-                credencial: 'token-oauth-generales'                         // AJUSTAR: ID de la credencial Secret text
+                auth:    'bearer',
+                token:   'CF_VIDA'                                                     // AJUSTAR: nombre en el Secret file
             ],
-            // ---- Consulta 2: <con:resource name="dad.json"> (body {}) ----
+            // ---- Consulta 2 ----
             [
-                nombre:     'Cad',
-                url:        'https://api-st.testnet.com/sCA/Coidad.json',    // AJUSTAR: <con:originalUri> real
-                metodo:     'POST',
-                headers:    ['Content-Type': 'application/json'],
-                body:       '{}',
-                auth:       'bearer',
-                credencial: 'token-oauth-generales'
+                nombre:  'Consentimiento Generales',
+                url:     'https://api.ejemplo.cl/generales/ReciboConsentimiento.json', // AJUSTAR: <con:originalUri>
+                metodo:  'POST',
+                headers: ['Content-Type': 'application/json'],
+                body:    '''{
+  "Consentimiento": {
+    "CodigoID": "AJUSTAR: pega aquí el contenido de <con:request> de este XML"
+  }
+}''',
+                auth:    'bearer',
+                token:   'GENERALES'
+            ],
+            // ---- Consulta 3 ----
+            [
+                nombre:  'Consentimiento VIDA',
+                url:     'https://api.ejemplo.cl/vida/ReciboConsentimiento.json',      // AJUSTAR: <con:originalUri>
+                metodo:  'POST',
+                headers: ['Content-Type': 'application/json'],
+                body:    '''{
+  "Consentimiento": {
+    "CodigoID": "AJUSTAR: pega aquí el contenido de <con:request> de este XML"
+  }
+}''',
+                auth:    'bearer',
+                token:   'VIDA'
             ]
+            // ---- Consultas 4, 5 y 6: copiar un bloque [ ... ] de arriba, poner una coma después del anterior y ajustar ----
         ]
     }
 
